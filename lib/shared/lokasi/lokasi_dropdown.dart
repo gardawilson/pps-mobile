@@ -5,11 +5,11 @@ import 'lokasi_view_model.dart';
 import 'lokasi_model.dart';
 
 class LokasiDropdown extends StatelessWidget {
-  final Lokasi? value; // ✅ sekarang pakai Lokasi, bukan String
+  final Lokasi? value;
   final ValueChanged<Lokasi?>? onChanged;
   final String hint;
   final bool includeSemua;
-  final Lokasi semuaOption; // ubah jadi Lokasi juga
+  final Lokasi semuaOption;
 
   const LokasiDropdown({
     super.key,
@@ -24,17 +24,7 @@ class LokasiDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<LokasiViewModel>(
       builder: (context, vm, _) {
-        if (vm.isLoading) {
-          return const SizedBox(
-            width: 24, height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
-        }
-
-        if (vm.errorMessage.isNotEmpty) return Text('Error: ${vm.errorMessage}');
-        if (vm.lokasiList.isEmpty) return const Text('Tidak ada data lokasi');
-
-        // ✅ Siapkan daftar lokasi (plus opsi "semua")
+        // Siapkan daftar lokasi (plus opsi "Semua" bila diminta)
         final lokasiItems = <Lokasi>[
           if (includeSemua) semuaOption,
           ...vm.lokasiList,
@@ -42,27 +32,43 @@ class LokasiDropdown extends StatelessWidget {
 
         final effectiveValue = value ?? (includeSemua ? semuaOption : null);
 
+        // Tentukan helperText (prioritas: error → empty)
+        final String? helperText = vm.errorMessage.isNotEmpty
+            ? 'Error: ${vm.errorMessage}'
+            : (vm.lokasiList.isEmpty ? 'Tidak ada data lokasi' : null);
+
         return AppSearchDropdown<Lokasi>(
           value: effectiveValue,
           items: lokasiItems,
+          enabled: !vm.isLoading,
+          isLoading: vm.isLoading,
+          helperText: helperText,
+          onRetry: vm.errorMessage.isNotEmpty
+              ? () => context.read<LokasiViewModel>().fetchLokasiList()
+              : null,
+
           hint: hint,
+          searchHint: 'Cari…',
+
+          // label tampilan
           itemAsString: (l) {
             if (l.idLokasi == '__SEMUA__') return 'Lokasi (Semua)';
             return l.idLokasi.isEmpty ? l.blok : '${l.blok}${l.idLokasi}';
           },
 
-          // 🔁 pastikan F31 ≠ B31 (bandingkan blok + id)
+          // pastikan equality berdasarkan blok+id
           compareFn: (a, b) => a.blok == b.blok && a.idLokasi == b.idLokasi,
 
-          // 🔎 pencarian fleksibel: case-insensitive + normalisasi spasi/dash
+          // pencarian fleksibel
           filterFn: (l, filter) {
             final q = filter.toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
-            final k1 = ('${l.blok}${l.idLokasi}').toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
-            final k2 = (l.blok).toLowerCase(); // ketik "a" → match semua A..
+            final k1 = ('${l.blok}${l.idLokasi}')
+                .toLowerCase()
+                .replaceAll(RegExp(r'[\s\-_]'), '');
+            final k2 = l.blok.toLowerCase();
             return k1.contains(q) || k2.contains(q);
           },
 
-          searchHint: 'Cari…',
           onChanged: (picked) {
             if (onChanged == null) return;
             if (picked?.idLokasi == '__SEMUA__') {
@@ -72,7 +78,6 @@ class LokasiDropdown extends StatelessWidget {
             }
           },
         );
-
       },
     );
   }

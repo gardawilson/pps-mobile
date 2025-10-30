@@ -16,13 +16,15 @@ import '../../../widgets/status_indicator.dart';
 class BarcodeQrScanStockOpnameScreen extends StatefulWidget {
   final String noSO;
   final String selectedFilter;
-  final String idLokasi;
+  final int idLokasi;
+  final String? blok;
 
   const BarcodeQrScanStockOpnameScreen({
     Key? key,
     required this.noSO,
     required this.selectedFilter,
     required this.idLokasi,
+    required this.blok,
   }) : super(key: key);
 
   @override
@@ -30,9 +32,13 @@ class BarcodeQrScanStockOpnameScreen extends StatefulWidget {
       _BarcodeQrScanStockOpnameScreenState();
 }
 
-class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnameScreen>
+class _BarcodeQrScanStockOpnameScreenState
+    extends State<BarcodeQrScanStockOpnameScreen>
     with SingleTickerProviderStateMixin {
-  final MobileScannerController cameraController = MobileScannerController();
+
+  // ✅ Controller dengan konfigurasi optimal untuk QR Code
+  late final MobileScannerController cameraController;
+
   bool isFlashOn = false;
   bool hasCameraPermission = false;
   late AnimationController _animationController;
@@ -51,6 +57,25 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
   @override
   void initState() {
     super.initState();
+
+    // ✅ Konfigurasi controller untuk scan cepat QR Code
+    cameraController = MobileScannerController(
+      facing: CameraFacing.back,
+      torchEnabled: false,
+
+      // ⚡ KUNCI KECEPATAN - deteksi tanpa pembatasan
+      detectionSpeed: DetectionSpeed.unrestricted,
+
+      // ⚡ Timeout minimal untuk responsif maksimal
+      detectionTimeoutMs: 100,
+
+      // ⚡ Tidak perlu image, hemat resource
+      returnImage: false,
+
+      // 🎯 FILTER HANYA QR CODE - skip barcode lain
+      formats: [BarcodeFormat.qrCode],
+    );
+
     _getCameraPermission();
 
     _animationController = AnimationController(
@@ -59,35 +84,39 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
     )..repeat(reverse: true);
   }
 
-  Future<void> _showConfirmDialog(String label, LabelValidationResult result) async {
-    return showDialog(
+  Future<void> _showConfirmBottomSheet(String label, LabelValidationResult result) async {
+    await showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => ConfirmationLabelStockOpnameDialog(
-        label: label,
-        result: result,
-        onConfirm: () async {
-          Navigator.of(ctx).pop();
-          await _saveLabel(label, result.jmlhSak ?? 0, result.berat ?? 0);
-        },
-        onManualInput: () async {
-          Navigator.of(ctx).pop();
-          await _showManualInputDialog(label);
-        },
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
+      builder: (ctx) {
+        return ConfirmationLabelStockOpnameSheet(
+          label: label,
+          result: result,
+          onConfirm: () async {
+            Navigator.of(ctx).pop();
+            await _saveLabel(label, result.jmlhSak ?? 0, result.berat ?? 0);
+          },
+          onManualInput: () async {
+            Navigator.of(ctx).pop();
+            await _showManualInputSheet(label);
+          },
+        );
+      },
     );
   }
 
-  Future<void> _showManualInputDialog(String label) async {
-    return showDialog(
+  Future<void> _showManualInputSheet(String label) async {
+    await showInputLabelStockOpnameBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => InputLabelStockOpnameDialog(
-        label: label,
-        onSave: (jmlhSak, berat) async {
-          await _saveLabel(label, jmlhSak, berat);
-        },
-      ),
+      label: label,
+      onSave: (jmlhSak, berat) async {
+        await _saveLabel(label, jmlhSak, berat);
+      },
     );
   }
 
@@ -101,19 +130,20 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
     });
 
     try {
-      final scanVM = Provider.of<StockOpnameScanViewModel>(context, listen: false);
+      final scanVM = context.read<StockOpnameScanViewModel>();
       final success = await scanVM.insertLabel(
         label: label,
         noSO: widget.noSO,
         jmlhSak: jmlhSak,
         berat: berat,
+        blok: widget.blok ?? '',
         idLokasi: widget.idLokasi,
       );
 
       if (success) {
         _audioPlayer.play(AssetSource('sounds/accepted.mp3'));
-        Provider.of<StockOpnameDetailViewModel>(context, listen: false)
-            .fetchInitialData(
+
+        await context.read<StockOpnameDetailViewModel>().fetchInitialData(
           widget.noSO,
           filterBy: widget.selectedFilter,
           idLokasi: widget.idLokasi,
@@ -121,7 +151,7 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
 
         _showSuccessStatus(
           'Data Berhasil Disimpan! 🎉',
-          'Label: $label\nJumlah: $jmlhSak sak\nBerat: $berat kg',
+          'Label: $label\nJumlah: $jmlhSak sak\nBerat: ${berat.toStringAsFixed(2)} kg',
         );
       } else {
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
@@ -132,14 +162,9 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
       }
     } catch (e) {
       _audioPlayer.play(AssetSource('sounds/denied.mp3'));
-      _showErrorStatus(
-        'Terjadi Kesalahan',
-        'Error: ${e.toString()}',
-      );
+      _showErrorStatus('Terjadi Kesalahan', 'Error: ${e.toString()}');
     } finally {
-      setState(() {
-        _isSaving = false;
-      });
+      setState(() => _isSaving = false);
     }
   }
 
@@ -150,20 +175,15 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
       _isSuccess = true;
       _showStatusIndicator = true;
     });
-
-    // Show haptic feedback
     Vibration.vibrate(duration: 100, amplitude: 128);
-
-    // Auto clear after 4 seconds
-    Future.delayed(Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _saveMessage = '';
-          _detailedMessage = '';
-          _lastScannedCode = null;
-          _showStatusIndicator = false;
-        });
-      }
+    Future.delayed(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      setState(() {
+        _saveMessage = '';
+        _detailedMessage = '';
+        _lastScannedCode = null;
+        _showStatusIndicator = false;
+      });
     });
   }
 
@@ -174,20 +194,15 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
       _isSuccess = false;
       _showStatusIndicator = true;
     });
-
-    // Show error vibration pattern
     Vibration.vibrate(pattern: [0, 200, 100, 200]);
-
-    // Auto clear after 5 seconds
-    Future.delayed(Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() {
-          _saveMessage = '';
-          _detailedMessage = '';
-          _lastScannedCode = null;
-          _showStatusIndicator = false;
-        });
-      }
+    Future.delayed(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      setState(() {
+        _saveMessage = '';
+        _detailedMessage = '';
+        _lastScannedCode = null;
+        _showStatusIndicator = false;
+      });
     });
   }
 
@@ -208,23 +223,19 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
 
   Future<void> _getCameraPermission() async {
     final status = await Permission.camera.request();
-    setState(() {
-      hasCameraPermission = status == PermissionStatus.granted;
-    });
+    setState(() => hasCameraPermission = status == PermissionStatus.granted);
 
     if (status == PermissionStatus.denied) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Izin kamera diperlukan untuk scanning'),
+          content: const Text('Izin kamera diperlukan untuk scanning'),
           backgroundColor: Colors.orange,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           action: SnackBarAction(
             label: 'Buka Pengaturan',
             textColor: Colors.white,
-            onPressed: () => openAppSettings(),
+            onPressed: openAppSettings,
           ),
         ),
       );
@@ -236,15 +247,16 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
     cameraController.dispose();
     _animationController.dispose();
     _debounceTimer?.cancel();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
   void _processScanResult(String rawValue) async {
+    // ⚡ Anti-duplikasi scan beruntun
     if (rawValue == _lastScannedCode) {
-      debugPrint('Duplicate scan ignored.');
+      debugPrint('🔄 Duplicate scan ignored: $rawValue');
       return;
     }
-
     _lastScannedCode = rawValue;
 
     setState(() {
@@ -256,188 +268,142 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
     });
 
     try {
-      final scanVM = Provider.of<StockOpnameScanViewModel>(context, listen: false);
-      final result = await scanVM.validateLabel(rawValue, widget.noSO);
+      final scanVM = context.read<StockOpnameScanViewModel>();
+      final result = await scanVM.validateLabel(rawValue, widget.blok!, widget.idLokasi, widget.noSO);
 
-      debugPrint('🔍 Result: $result');
-      debugPrint('🔍 Result.labelType: ${result?.labelType}');
-      debugPrint('🔍 Result.message: ${result?.message}');
-      debugPrint('🔍 Result.foundInStockOpname: ${result?.foundInStockOpname}');
-      debugPrint('🔍 Result.isDuplicate: ${result?.isDuplicate}');
-      debugPrint('🔍 Result.canInsert: ${result?.canInsert}');
+      setState(() => _isSaving = false);
 
-      setState(() {
-        _isSaving = false;
-      });
-
-      // Check if result is null or doesn't have required data
-      if (result == null || result.labelType == null ) {
+      if (result == null || result.labelType == null) {
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
-        _showErrorStatus(
-            'Validasi Gagal',
-            'Label tidak dapat divalidasi\nLabel: $rawValue'
-        );
+        _showErrorStatus('Validasi Gagal', 'Label tidak dapat divalidasi\nLabel: $rawValue');
         return;
       }
-
-      // Handle duplicate label case
       if (result.isDuplicate) {
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
         _showErrorStatus('Label Duplikat!', result.message);
         return;
       }
-
-      // Handle category invalid case
       if (!result.isValidCategory && result.foundInStockOpname) {
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
         _showErrorStatus('Kategori Tidak Sesuai', result.message);
         return;
       }
 
-      // If validation successful, show confirmation dialog
-      await _showConfirmDialog(rawValue, result);
-
+      await _showConfirmBottomSheet(rawValue, result);
     } catch (e) {
-      setState(() {
-        _isSaving = false;
-      });
-
-      debugPrint('❌ Error saat validasi: $e');
+      setState(() => _isSaving = false);
       _audioPlayer.play(AssetSource('sounds/denied.mp3'));
-      _showErrorStatus(
-          'Koneksi Bermasalah 📱',
-          'Periksa koneksi internet Anda'
-      );
+      _showErrorStatus('Koneksi Bermasalah 📱', 'Periksa koneksi internet Anda');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scanAreaSize = screenWidth * 0.6;
-    int count = Provider.of<StockOpnameDetailViewModel>(context, listen: false)
-        .totalData;
+    final screen = MediaQuery.of(context).size;
+    final scanAreaSize = screen.width * 0.6;
+    final count = context.read<StockOpnameDetailViewModel>().totalData;
+
+    final lokasiTitle = widget.blok == null || widget.blok!.isEmpty
+        ? 'Lokasi ${widget.idLokasi}'
+        : 'Lokasi ${widget.blok}${widget.idLokasi}';
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
-          'Lokasi ${widget.idLokasi} | ${count}',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          '$lokasiTitle | $count',
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white.withOpacity(0.9),
         elevation: 0,
-        iconTheme: IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
-            icon: Icon(
-              isFlashOn ? Icons.flash_off : Icons.flash_on,
-              color: Colors.black,
-            ),
-            onPressed: () {
-              setState(() {
-                isFlashOn = !isFlashOn;
-              });
-              cameraController.toggleTorch();
+            icon: Icon(isFlashOn ? Icons.flash_off : Icons.flash_on, color: Colors.black),
+            onPressed: () async {
+              try {
+                await cameraController.toggleTorch();
+                setState(() => isFlashOn = !isFlashOn);
+              } catch (e) {
+                debugPrint('Error toggling torch: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Flash tidak tersedia pada perangkat ini'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Camera view
+          // ✅ Camera dengan controller yang sudah dikonfigurasi
           if (hasCameraPermission)
             MobileScanner(
-              controller: cameraController,
+              controller: cameraController, // ⭐ Gunakan controller yang sudah optimal
               scanWindow: Rect.fromCenter(
-                center: Offset(screenWidth / 2, screenHeight / 2),
-                width: scanAreaSize,
-                height: scanAreaSize,
+                center: Offset(screen.width / 2, screen.height / 2),
+                width: scanAreaSize * 0.95,
+                height: scanAreaSize * 0.95,
               ),
               onDetect: (capture) {
                 try {
-                  final List<Barcode> barcodes = capture.barcodes;
-                  if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                    final String rawValue = barcodes.first.rawValue!;
+                  final codes = capture.barcodes;
 
-                    if (!_isDetected) {
-                      setState(() {
-                        _isDetected = true;
-                      });
-                      _animationController.forward(from: 0);
+                  // ⚡ Filter cepat - ambil QR pertama
+                  if (codes.isEmpty) return;
 
-                      _debounceTimer?.cancel();
-                      _debounceTimer = Timer(Duration(milliseconds: 500), () {
-                        setState(() {
-                          _isDetected = false;
-                        });
-                        _processScanResult(rawValue);
-                      });
-                    }
+                  // 🎯 Cari QR Code pertama yang valid
+                  final qrCode = codes.firstWhere(
+                        (b) => b.rawValue != null &&
+                        b.rawValue!.isNotEmpty &&
+                        b.format == BarcodeFormat.qrCode,
+                    orElse: () => Barcode(rawValue: null),
+                  );
+
+                  if (qrCode.rawValue == null) return;
+                  final raw = qrCode.rawValue!;
+
+                  // ⚡ Debounce ultra-pendek untuk responsif
+                  if (!_isDetected) {
+                    setState(() => _isDetected = true);
+                    _animationController.forward(from: 0);
+
+                    _debounceTimer?.cancel();
+                    _debounceTimer = Timer(const Duration(milliseconds: 200), () {
+                      if (!mounted) return;
+                      setState(() => _isDetected = false);
+                      _processScanResult(raw);
+                    });
                   }
                 } catch (e) {
-                  debugPrint('Error during barcode detection: $e');
-                  _showErrorStatus(
-                      'Error Scan 📱',
-                      'Terjadi kesalahan saat memproses barcode'
-                  );
+                  debugPrint('❌ Error during QR detection: $e');
+                  _showErrorStatus('Error Scan 📱', 'Terjadi kesalahan saat memproses QR code');
                 }
               },
             )
           else
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.camera_alt, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'Izin kamera diperlukan untuk scanning',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _getCameraPermission,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      'Berikan Izin Kamera',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _NoPermission(onRequest: _getCameraPermission),
 
-          // Scan area overlay with enhanced animation
+          // Frame scan area
           Align(
             alignment: Alignment.center,
             child: AnimatedContainer(
-              duration: Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 300),
               width: scanAreaSize,
               height: scanAreaSize,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _isDetected
-                      ? Colors.greenAccent
-                      : Colors.white.withOpacity(0.5),
+                  color: _isDetected ? Colors.greenAccent : Colors.white.withOpacity(0.5),
                   width: 3,
                 ),
                 boxShadow: _isDetected
-                    ? [
-                  BoxShadow(
-                    color: Colors.greenAccent.withOpacity(0.5),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  )
-                ]
+                    ? [BoxShadow(color: Colors.greenAccent.withOpacity(0.5), blurRadius: 20, spreadRadius: 5)]
                     : null,
               ),
               child: _isDetected
@@ -451,7 +417,7 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
             ),
           ),
 
-          // Enhanced status indicator
+          // Status indicator
           if (_showStatusIndicator)
             Positioned(
               top: 140,
@@ -465,7 +431,7 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
               ),
             ),
 
-          // Interactive notification
+          // Notification
           if (_saveMessage.isNotEmpty)
             Positioned(
               bottom: 50,
@@ -481,31 +447,66 @@ class _BarcodeQrScanStockOpnameScreenState extends State<BarcodeQrScanStockOpnam
               ),
             ),
 
-          // Scan instruction overlay
+          // Hint
           if (_saveMessage.isEmpty && !_isSaving)
-            Positioned(
+            const Positioned(
               bottom: 50,
               left: 0,
               right: 0,
-              child: Center(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Arahkan kamera ke barcode atau QR code',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
+              child: _ScanHint(),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _NoPermission extends StatelessWidget {
+  const _NoPermission({required this.onRequest});
+  final VoidCallback onRequest;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.camera_alt, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          Text('Izin kamera diperlukan untuk scanning',
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]), textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: onRequest,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Berikan Izin Kamera', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanHint extends StatelessWidget {
+  const _ScanHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          'Arahkan kamera ke QR code',
+          style: TextStyle(color: Colors.white, fontSize: 14),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }

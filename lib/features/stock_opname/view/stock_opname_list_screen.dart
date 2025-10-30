@@ -281,6 +281,7 @@ class StockOpnameListScreen extends StatelessWidget {
       case 'Gilingan':
       case 'Mixer':
       case 'Furniture WIP':
+      case 'Barang Jadi':
       case 'Reject':
         return Colors.blue[600]!;
       default:

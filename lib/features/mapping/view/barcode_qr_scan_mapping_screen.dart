@@ -10,8 +10,8 @@ import '../../../widgets/status_indicator.dart';
 import '../../../utils/permission_helper.dart';
 
 class BarcodeQrScanMappingScreen extends StatefulWidget {
-  final String selectedFilter;  // opsional, tetap dipertahankan jika perlu
-  final String idLokasi;        // lokasi tujuan mapping
+  final String selectedFilter;
+  final String idLokasi;
   final String? blok;
 
   const BarcodeQrScanMappingScreen({
@@ -28,7 +28,10 @@ class BarcodeQrScanMappingScreen extends StatefulWidget {
 
 class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
     with SingleTickerProviderStateMixin {
-  final MobileScannerController cameraController = MobileScannerController();
+
+  // ✅ Controller dengan konfigurasi lengkap
+  late final MobileScannerController cameraController;
+
   final AudioPlayer _audioPlayer = AudioPlayer();
   final _mappingRepo = LabelMappingRepository();
 
@@ -49,6 +52,16 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
   @override
   void initState() {
     super.initState();
+
+    // ✅ Inisialisasi controller dengan konfigurasi lengkap
+    cameraController = MobileScannerController(
+      facing: CameraFacing.back,
+      detectionSpeed: DetectionSpeed.unrestricted,
+      detectionTimeoutMs: 100,
+      returnImage: false,
+      torchEnabled: false, // ⭐ Penting untuk flash
+    );
+
     _getCameraPermission();
 
     _animationController = AnimationController(
@@ -72,7 +85,6 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
       hasCameraPermission = granted;
     });
   }
-
 
   // ====== UI helpers ======
   void _showSuccessStatus(String title, String message) {
@@ -145,15 +157,15 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
 
     try {
       final res = await _mappingRepo.updateLabelLocation(
-        labelCode: labelCode,
-        idLokasi: widget.idLokasi,
-        blok: widget.blok ?? ''
+          labelCode: labelCode,
+          idLokasi: widget.idLokasi,
+          blok: widget.blok ?? ''
       );
 
       if (res.success) {
         await _audioPlayer.play(AssetSource('sounds/accepted.mp3'));
         _showSuccessStatus(
-          'Lokasi berhasil diupdate 🎉',
+          'Lokasi berhasil diupdate!',
           res.message.isNotEmpty
               ? res.message
               : 'Label: $labelCode dipindah ke ${widget.idLokasi}',
@@ -198,7 +210,7 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
-          'Lokasi ${widget.idLokasi}',
+          'Lokasi ${widget.blok}${widget.idLokasi}',
           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white.withOpacity(0.9),
@@ -207,27 +219,37 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
         actions: [
           IconButton(
             icon: Icon(
-              isFlashOn ? Icons.flash_off : Icons.flash_on,
-              color: Colors.black,
+                isFlashOn ? Icons.flash_off : Icons.flash_on,
+                color: Colors.black
             ),
-            onPressed: () {
-              setState(() => isFlashOn = !isFlashOn);
-              cameraController.toggleTorch();
+            onPressed: () async {
+              // ✅ Tambahkan async dan error handling
+              try {
+                await cameraController.toggleTorch();
+                setState(() {
+                  isFlashOn = !isFlashOn;
+                });
+              } catch (e) {
+                debugPrint('Error toggling torch: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Flash tidak tersedia pada perangkat ini'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Camera view
+          // ✅ Camera view - gunakan controller yang sama
           if (hasCameraPermission)
             MobileScanner(
-              controller: MobileScannerController(
-                facing: CameraFacing.back,
-                detectionSpeed: DetectionSpeed.unrestricted, // cepat
-                detectionTimeoutMs: 100,                     // responsif
-                returnImage: false,
-              ),
+              controller: cameraController, // ⭐ Gunakan controller yang sudah dibuat
               scanWindow: Rect.fromCenter(
                 center: Offset(screenWidth / 2, screenHeight / 2),
                 width: scanAreaSize * 0.95,
@@ -239,10 +261,9 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
                   if (barcodes.isEmpty) return;
 
                   // 🔍 Filter hanya QR Code berdasarkan format
-                  // beberapa versi pakai .format, beberapa pakai .type atau .rawValue
                   final qr = barcodes.firstWhere(
                         (b) {
-                      final format = b.format.name.toLowerCase() ?? '';
+                      final format = b.format.name.toLowerCase();
                       return b.rawValue != null &&
                           b.rawValue!.isNotEmpty &&
                           (format.contains('qr') || format.contains('qrcode'));
@@ -271,7 +292,6 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
                 }
               },
             )
-
           else
             Center(
               child: Column(
@@ -339,12 +359,11 @@ class _BarcodeQrScanMappingScreenState extends State<BarcodeQrScanMappingScreen>
               right: 0,
               child: Center(
                 child: StatusIndicator(
-                  isSuccess: _isSuccess,   // ⬅️ gunakan state dinamis
+                  isSuccess: _isSuccess,
                   isVisible: _showStatusIndicator,
                 ),
               ),
             ),
-
 
           // Notification panel (bottom)
           if (_saveMessage.isNotEmpty)

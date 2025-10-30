@@ -13,10 +13,6 @@ class ApiConstants {
 
   static String scanLabel(String noSO) => '$baseUrl/api/no-stock-opname/$noSO/scan';
 
-  static String scanLabelNyangkut(String noNyangkut) => '$baseUrl/api/label-nyangkut/$noNyangkut';
-
-  static String scanLabelLancar(String noLabel) => '$baseUrl/api/label-nyangkut/lancar/$noLabel';
-
   static String labelData(String noLabel) => '$baseUrl/api/label-data/$noLabel';
 
   static String labelSOList({
@@ -24,13 +20,23 @@ class ApiConstants {
     required int page,
     required int pageSize,
     String? filterBy,
-    String? idLokasi,
+    String? blok,         // opsional
+    int? idLokasi,        // int? biar konsisten dengan model/VM
+    String? search,       // opsional
   }) {
-    final filter = filterBy ?? 'all';
-    final lokasi = idLokasi ?? 'all';
-    return '$baseUrl/api/no-stock-opname/$selectedNoSO/hasil?page=$page&pageSize=$pageSize&filterBy=$filter&idlokasi=$lokasi&filterbyuser=true';
-  }
+    final params = <String, String>{
+      'page'         : '$page',
+      'pageSize'     : '$pageSize',
+      'filterBy'     : filterBy ?? 'all',
+      'idLokasi'     : (idLokasi == null || idLokasi == 0) ? 'all' : idLokasi.toString(),
+      'filterbyuser' : 'true', // hardcode di sini
+      if (blok != null && blok.isNotEmpty) 'blok': blok,
+      if (search != null && search.isNotEmpty) 'search': Uri.encodeQueryComponent(search),
+    };
 
+    final query = Uri(queryParameters: params).query;
+    return '$baseUrl/api/no-stock-opname/$selectedNoSO/hasil?$query';
+  }
 
   static String labelList({
     required int page,
@@ -54,15 +60,4 @@ class ApiConstants {
     return '$baseUrl/api/label-list?page=$page&pageSize=$loadMoreSize&filterBy=$currentFilter&idlokasi=$currentLocation';
   }
 
-  static String labelNyangkut({
-    required String nonyangkut,
-    required int page,
-    required int pageSize,
-    String? filterBy,
-    String? idLokasi,
-  }) {
-    final filter = filterBy ?? 'all';
-    final lokasi = idLokasi ?? 'all';
-    return '$baseUrl/api/label-nyangkut/$nonyangkut?page=$page&pageSize=$pageSize&filterBy=$filter&idlokasi=$lokasi';
-  }
 }

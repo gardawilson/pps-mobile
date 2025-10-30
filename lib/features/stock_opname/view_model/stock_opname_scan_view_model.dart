@@ -17,7 +17,7 @@ class StockOpnameScanViewModel extends ChangeNotifier {
   }
 
   /// Validasi label
-  Future<LabelValidationResult?> validateLabel(String label, String noSO) async {
+  Future<LabelValidationResult?> validateLabel(String label, String blok, int idlokasi, String noSO) async {
     final token = await _getToken();
     if (token == null) {
       debugPrint('❌ Token tidak tersedia');
@@ -34,7 +34,7 @@ class StockOpnameScanViewModel extends ChangeNotifier {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({'label': label}),
+        body: json.encode({'label': label, 'blok': blok,'idlokasi': idlokasi}),
       );
 
       debugPrint('📥 Response [${response.statusCode}]: ${response.body}');
@@ -54,7 +54,8 @@ class StockOpnameScanViewModel extends ChangeNotifier {
     required String noSO,
     required int jmlhSak,
     required double berat,
-    required String idLokasi,
+    required String blok,
+    required int idLokasi,
   }) async {
     final token = await _getToken();
     if (token == null) {
@@ -81,6 +82,7 @@ class StockOpnameScanViewModel extends ChangeNotifier {
           'jmlhSak': jmlhSak,
           'berat': berat,
           'idlokasi': idLokasi,
+          'blok': blok,
         }),
       );
 

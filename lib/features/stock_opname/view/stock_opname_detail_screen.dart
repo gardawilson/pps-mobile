@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import '../../../shared/lokasi/lokasi_dropdown.dart';
+import '../../../shared/lokasi/lokasi_model.dart';
+import '../../../shared/lokasi/lokasi_view_model.dart';
 import '../view_model/stock_opname_detail_view_model.dart';
-import '../view_model/lokasi_view_model.dart';
 import '../view_model/stock_opname_scan_view_model.dart';
 import '../../../widgets/loading_skeleton.dart';
 import 'barcode_qr_scan_stock_opname_screen.dart';
 import '../model/label_validation_result.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import '../widget/confirmation_label_stock_opname_dialog.dart';
 import '../widget/input_detail_label_stock_opname_dialog.dart';
 import '../../../widgets/error_status_dialog.dart';
@@ -28,33 +29,34 @@ class StockOpnameDetailScreen extends StatefulWidget {
 
 class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   final ScrollController _scrollController = ScrollController();
+// state
   String? _selectedFilter;
-  String? _selectedIdLokasi;
+  String? _selectedBlok;     // ← baru
+  int? _selectedIdLokasi;    // ← ganti ke int?
   bool isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
-    final viewModel = Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-    final lokasiVM = Provider.of<LokasiViewModel>(context, listen: false);
+    final viewModel = context.read<StockOpnameDetailViewModel>();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      viewModel.fetchInitialData(widget.noSO);
-      lokasiVM.fetchLokasi();
+      context.read<LokasiViewModel>().fetchLokasiList(); // ← penting
+      viewModel.fetchInitialData(widget.noSO); // lokasi VM fetch di provider/ensureLoaded
     });
 
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
-        final viewModel = Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-        if (!isLoadingMore && viewModel.hasMoreData) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 100) {
+        final vm = context.read<StockOpnameDetailViewModel>();
+        if (!isLoadingMore && vm.hasMoreData) {
           isLoadingMore = true;
-          viewModel.loadMoreData().then((_) {
-            isLoadingMore = false;
-          });
+          vm.loadMoreData().then((_) => isLoadingMore = false);
         }
       }
     });
   }
+
 
   @override
   void dispose() {
@@ -279,9 +281,10 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
                                     _buildInfoRow(
                                       icon: Icons.place_rounded,
                                       label: 'Lokasi',
-                                      value: label.idLokasi!,
+                                      value: _formatLokasi(blok: label.blok, idLokasi: label.idLokasi), // ✅
                                       iconColor: const Color(0xFFE91E63),
                                     ),
+
                                   ],
                                 ),
                               ],
@@ -324,6 +327,16 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
         ],
       ),
     );
+  }
+
+  String _formatLokasi({String? blok, int? idLokasi}) {
+    final hasBlok = blok != null && blok.isNotEmpty;
+    final hasId   = idLokasi != null && idLokasi! > 0;
+    if (!hasBlok && !hasId) return '-';
+    final sb = StringBuffer();
+    if (hasBlok) sb.write(blok);
+    if (hasId) sb.write(idLokasi.toString());
+    return sb.toString();
   }
 
   Widget _buildInfoRow({
@@ -382,14 +395,12 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
         hint: const Text('Filter'),
         isExpanded: true,
         onChanged: (value) {
-          setState(() {
-            _selectedFilter = value;
-          });
-          final viewModel = Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-          viewModel.fetchInitialData(
+          setState(() => _selectedFilter = value);
+          context.read<StockOpnameDetailViewModel>().fetchInitialData(
             widget.noSO,
             filterBy: value ?? 'all',
-            idLokasi: _selectedIdLokasi, // Pertahankan idLokasi saat filter berubah
+            blok: _selectedBlok,
+            idLokasi: _selectedIdLokasi,
           );
         },
         items: const [
@@ -573,100 +584,72 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
 
 
   Widget _buildLokasiDropdown() {
-    return Consumer<LokasiViewModel>(
-      builder: (context, lokasiVM, child) {
-        if (lokasiVM.isLoading) {
-          return const SizedBox(
-            width: 125,
-            child: Center(child: CircularProgressIndicator()),
+    Lokasi? currentValue() {
+      if (_selectedBlok == null && _selectedIdLokasi == null) {
+        return const Lokasi(idLokasi: '__SEMUA__', blok: '-', enable: true);
+      }
+      if (_selectedBlok != null && (_selectedIdLokasi == null || _selectedIdLokasi == 0)) {
+        return Lokasi(idLokasi: '', blok: _selectedBlok!, enable: true);
+      }
+      if (_selectedBlok != null && _selectedIdLokasi != null) {
+        return Lokasi(
+          idLokasi: _selectedIdLokasi!.toString(),
+          blok: _selectedBlok!,
+          enable: true,
+        );
+      }
+      return const Lokasi(idLokasi: '__SEMUA__', blok: '-', enable: true);
+    }
+
+    return SizedBox(
+      width: 180,
+      child: LokasiDropdown(
+        value: currentValue(),
+        includeSemua: true,
+        onChanged: (Lokasi? picked) {
+          String? blok;
+          int? id;
+
+          if (picked == null || picked.idLokasi == '__SEMUA__') {
+            blok = null;
+            id = null;
+          } else {
+            blok = picked.blok.isEmpty ? null : picked.blok;
+            id   = picked.idLokasi.isEmpty ? null : int.tryParse(picked.idLokasi);
+          }
+
+          setState(() {
+            _selectedBlok = blok;
+            _selectedIdLokasi = id;
+          });
+
+          final vm = context.read<StockOpnameDetailViewModel>();
+          vm.fetchInitialData(
+            widget.noSO,
+            filterBy: _selectedFilter ?? 'all',
+            blok: _selectedBlok,         // String?
+            idLokasi: _selectedIdLokasi, // int?
           );
-        }
-
-        // List item dengan value dan label
-        final lokasiItems = [
-          const MapEntry('all', 'Semua'), // Value = 'all', Label = 'Semua'
-          ...lokasiVM.lokasiList.map(
-                (e) => MapEntry(e.idLokasi, e.idLokasi),
-          ),
-        ];
-
-        // Temukan item yang sedang dipilih berdasarkan value _selectedIdLokasi
-        final selectedEntry = lokasiItems.firstWhere(
-              (item) => item.key == (_selectedIdLokasi ?? 'all'),
-          orElse: () => lokasiItems.first,
-        );
-
-        return Container(
-          width: 125,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: DropdownSearch<MapEntry<String, String>>(
-            items: lokasiItems,
-            selectedItem: selectedEntry,
-            itemAsString: (item) => item.value, // Tampilkan label (e.g., 'Semua')
-            popupProps: const PopupProps.menu(
-              showSearchBox: true,
-              fit: FlexFit.loose,
-              searchFieldProps: TextFieldProps(
-                decoration: InputDecoration(
-                  hintText: "Cari lokasi...",
-                ),
-              ),
-            ),
-            dropdownButtonProps: const DropdownButtonProps(
-              icon: Icon(Icons.arrow_drop_down),
-              padding: EdgeInsets.zero,
-            ),
-            dropdownDecoratorProps: const DropDownDecoratorProps(
-              dropdownSearchDecoration: InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 12),
-                isDense: true,
-                hintText: "Lokasi",
-              ),
-            ),
-            onChanged: (selectedEntry) {
-              final selectedId = selectedEntry?.key;
-
-              setState(() {
-                _selectedIdLokasi = selectedId;
-              });
-
-              final viewModel = Provider.of<StockOpnameDetailViewModel>(
-                context,
-                listen: false,
-              );
-
-              viewModel.fetchInitialData(
-                widget.noSO,
-                filterBy: _selectedFilter ?? 'all',
-                idLokasi: selectedId == 'all' ? null : selectedId,
-              );
-            },
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 
 
   void _showScanBarQRCode(BuildContext context) {
-    if (_selectedIdLokasi == null || _selectedIdLokasi!.isEmpty || _selectedIdLokasi == 'all') {
+    if (_selectedIdLokasi == null || _selectedIdLokasi == 0) {
       showErrorStatusDialog(context, 'Lokasi belum dipilih!', 'Silakan pilih lokasi terlebih dahulu.');
-      return; // Hentikan proses jika belum pilih lokasi
+      return;
     }
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BarcodeQrScanStockOpnameScreen(
+        builder: (_) => BarcodeQrScanStockOpnameScreen(
           noSO: widget.noSO,
           selectedFilter: _selectedFilter ?? 'all',
-          idLokasi: _selectedIdLokasi!,
+          idLokasi: _selectedIdLokasi!, // kalau screen ini masih butuh String, ubah param screen ke int
+          blok: _selectedBlok,
         ),
       ),
     );
@@ -676,7 +659,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   void _showAddManualDialog(BuildContext context) {
     final scanVM = context.read<StockOpnameScanViewModel>();
 
-    if (_selectedIdLokasi == null || _selectedIdLokasi!.isEmpty || _selectedIdLokasi == 'all') {
+    if (_selectedIdLokasi == null || _selectedIdLokasi == 'all') {
       showErrorStatusDialog(context, 'Lokasi belum dipilih!', 'Silakan pilih lokasi terlebih dahulu.');
       return; // Hentikan proses jika belum pilih lokasi
     }
@@ -685,7 +668,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
       context: context,
       builder: (context) => InputIdLabelStockOpnameDialog(
         onSubmit: (label) async {
-          final result = await scanVM.validateLabel(label, widget.noSO);
+          final result = await scanVM.validateLabel(label, _selectedBlok!, _selectedIdLokasi!, widget.noSO);
 
           if (result == null || result.labelType == null || result.labelType.isEmpty) {
             showErrorStatusDialog(context, 'Validasi gagal', 'Tidak dapat memvalidasi label: $label');
@@ -719,37 +702,42 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
 
 
   Future<void> _showConfirmDialog(String label, LabelValidationResult result) async {
-    return showDialog(
+    await showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => ConfirmationLabelStockOpnameDialog(
-        label: label,
-        result: result,
-        onConfirm: () async {
-          Navigator.of(ctx).pop();
-          await _saveLabel(label, result.jmlhSak!, result.berat!);
-        },
-        onManualInput: () async {
-          Navigator.of(ctx).pop();
-          await _showManualInputDialog(label);
-        },
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
+      builder: (ctx) {
+        return ConfirmationLabelStockOpnameSheet(
+          label: label,
+          result: result,
+          onConfirm: () async {
+            Navigator.of(ctx).pop();
+            // avoid NPE if server didn’t send values
+            await _saveLabel(label, result.jmlhSak ?? 0, result.berat ?? 0);
+          },
+          onManualInput: () async {
+            Navigator.of(ctx).pop();
+            await _showManualInputSheet(label);
+          },
+        );
+      },
     );
   }
 
-
-  Future<void> _showManualInputDialog(String label) async {
-    return showDialog(
+  Future<void> _showManualInputSheet(String label) async {
+    await showInputLabelStockOpnameBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => InputLabelStockOpnameDialog(
-        label: label,
-        onSave: (jmlhSak, berat) async {
-          await _saveLabel(label, jmlhSak, berat);
-        },
-      ),
+      label: label,
+      onSave: (jmlhSak, berat) async {
+        await _saveLabel(label, jmlhSak, berat);
+      },
     );
   }
+
 
 
   Future<void> _saveLabel(String label, int jmlhSak, double berat) async {
@@ -770,6 +758,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
         noSO: widget.noSO,
         jmlhSak: jmlhSak,
         berat: berat,
+        blok: _selectedBlok ?? '',
         idLokasi: _selectedIdLokasi!,
       );
 

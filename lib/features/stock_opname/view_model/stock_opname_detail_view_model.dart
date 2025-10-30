@@ -6,52 +6,118 @@ import '../../../constants/api_constants.dart';
 import '../model/stock_opname_label_model.dart';
 
 class StockOpnameDetailViewModel extends ChangeNotifier {
+  // ===== State filter =====
   String noSO = '';
-  String? currentFilter;
-  String? currentIdLokasi; // Tambahkan field untuk idLokasi
+  String? currentFilter;        // kategori: all/bahanbaku/dll
+  String? currentBlok;          // ex: 'A', 'B', ...
+  int? currentIdLokasi;         // ex: 31, 0/null = all
+  String? searchKeyword;        // kata kunci pencarian
 
-  List<StockOpnameLabel> labels = [];
+  // ===== Data list =====
+  final List<StockOpnameLabel> labels = [];
 
+  // ===== Paging & aggregate =====
   int page = 1;
   int pageSize = 50;
   int totalData = 0;
   int totalSak = 0;
-  double totalBerat = 0;
-
+  double totalBerat = 0.0;
   bool hasMoreData = true;
 
+  // ===== UI flags =====
   bool isInitialLoading = false;
   bool isLoadingMore = false;
   bool hasError = false;
   String errorMessage = '';
 
+  // ===== Helpers =====
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
   }
 
-  Future<void> fetchInitialData(String selectedNoSO, {String filterBy = 'all', String? idLokasi}) async {
+  // ===== Public APIs =====
+  Future<void> fetchInitialData(
+      String selectedNoSO, {
+        String filterBy = 'all',
+        String? blok,
+        int? idLokasi,
+        String? search,
+      }) async {
     noSO = selectedNoSO;
     currentFilter = filterBy;
-    currentIdLokasi = idLokasi; // Simpan idLokasi yang dipilih
+    currentBlok = blok;
+    currentIdLokasi = idLokasi;
+    searchKeyword = search;
+
     page = 1;
     hasMoreData = true;
     labels.clear();
+
     isInitialLoading = true;
+    hasError = false;
+    errorMessage = '';
     notifyListeners();
 
     await _fetchData();
+  }
+
+  Future<void> search(String keyword) async {
+    searchKeyword = keyword;
+    page = 1;
+    hasMoreData = true;
+    labels.clear();
+
+    isInitialLoading = true;
+    hasError = false;
+    errorMessage = '';
+    notifyListeners();
+
+    await _fetchData();
+  }
+
+  void clearSearch() {
+    searchKeyword = null;
+    page = 1;
+    hasMoreData = true;
+    labels.clear();
+
+    isInitialLoading = true;
+    hasError = false;
+    errorMessage = '';
+    notifyListeners();
+
+    _fetchData();
   }
 
   Future<void> loadMoreData() async {
     if (isLoadingMore || !hasMoreData) return;
-    page++;
     isLoadingMore = true;
+    page += 1;
     notifyListeners();
 
     await _fetchData();
   }
 
+  void reset() {
+    labels.clear();
+    page = 1;
+    totalData = 0;
+    totalSak = 0;
+    totalBerat = 0.0;
+    hasMoreData = true;
+    errorMessage = '';
+    hasError = false;
+
+    currentFilter = null;
+    currentBlok = null;
+    currentIdLokasi = null;
+    searchKeyword = null;
+
+    notifyListeners();
+  }
+
+  // ===== Core fetch =====
   Future<void> _fetchData() async {
     try {
       final token = await _getToken();
@@ -62,53 +128,52 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
           page: page,
           pageSize: pageSize,
           filterBy: currentFilter,
-          idLokasi: currentIdLokasi, // Pass idLokasi ke API constants
+          blok: currentBlok,                 // ← kirim blok (boleh null)
+          idLokasi: currentIdLokasi,         // ← kirim int? (null/0 → 'all' di ApiConstants)
+          search: searchKeyword,             // ← kirim search jika ada
         ),
       );
 
-      final response = await http.get(url, headers: {
-        'Authorization': 'Bearer $token',
-      });
+      // debug print
+      // print('🌐 GET: $url');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> labelData = data['data'];
-        final int total = data['totalData'];
-        final int sumSak = data['totalSak'];
-        final double sumBerat = (data['totalBerat'] as num?)?.toDouble() ?? 0.0;
+      final resp = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
 
-        final fetched = labelData.map((e) => StockOpnameLabel.fromJson(e)).toList();
+      if (resp.statusCode == 200) {
+        final body = json.decode(resp.body) as Map<String, dynamic>;
 
-        labels.addAll(fetched);
-        totalData = total;
-        totalSak = sumSak;
-        totalBerat = sumBerat;
-        hasMoreData = labels.length < total;
+        final List<dynamic> list = body['data'] ?? [];
+        final fetched = list.map((e) => StockOpnameLabel.fromJson(e)).toList();
+
+        if (page == 1) {
+          labels
+            ..clear()
+            ..addAll(fetched);
+        } else {
+          labels.addAll(fetched);
+        }
+
+        totalData  = (body['totalData']  as num?)?.toInt() ?? labels.length;
+        totalSak   = (body['totalSak']   as num?)?.toInt() ?? 0;
+        totalBerat = (body['totalBerat'] as num?)?.toDouble() ?? 0.0;
+
+        hasMoreData = labels.length < totalData;
         hasError = false;
         errorMessage = '';
       } else {
         hasError = true;
-        errorMessage = 'Gagal mengambil data (status: ${response.statusCode})';
-        print('❌ ERROR: $errorMessage');
+        errorMessage = 'Gagal mengambil data (status: ${resp.statusCode})';
       }
     } catch (e) {
       hasError = true;
       errorMessage = 'Kesalahan jaringan: $e';
-      print('❌ EXCEPTION: $errorMessage');
     } finally {
       isInitialLoading = false;
       isLoadingMore = false;
       notifyListeners();
     }
-  }
-
-  void reset() {
-    labels.clear();
-    page = 1;
-    totalData = 0;
-    hasMoreData = true;
-    errorMessage = '';
-    currentIdLokasi = null; // Reset idLokasi
-    notifyListeners();
   }
 }
