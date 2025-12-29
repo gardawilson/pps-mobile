@@ -99,28 +99,33 @@ class _BarcodeQrScanStockOpnameScreenState
           result: result,
           onConfirm: () async {
             Navigator.of(ctx).pop();
-            await _saveLabel(label, result.jmlhSak ?? 0, result.berat ?? 0);
+            await _saveLabel(label, result.jmlhSak ?? 0, result.berat ?? 0, result.idDiscrepancy);
           },
           onManualInput: () async {
             Navigator.of(ctx).pop();
-            await _showManualInputSheet(label);
+            await _showManualInputSheet(label, result.idDiscrepancy);
           },
         );
       },
     );
   }
 
-  Future<void> _showManualInputSheet(String label) async {
+  Future<void> _showManualInputSheet(String label, int? idDiscrepancy) async {
     await showInputLabelStockOpnameBottomSheet(
       context: context,
       label: label,
       onSave: (jmlhSak, berat) async {
-        await _saveLabel(label, jmlhSak, berat);
+        await _saveLabel(label, jmlhSak, berat, idDiscrepancy);
       },
     );
   }
 
-  Future<void> _saveLabel(String label, int jmlhSak, double berat) async {
+  Future<void> _saveLabel(
+      String label,
+      int jmlhSak,
+      double berat,
+      int? idDiscrepancy,
+      ) async {
     setState(() {
       _isSaving = true;
       _saveMessage = 'Menyimpan data...';
@@ -138,6 +143,7 @@ class _BarcodeQrScanStockOpnameScreenState
         berat: berat,
         blok: widget.blok ?? '',
         idLokasi: widget.idLokasi,
+        idDiscrepancy: idDiscrepancy, // ⬅️ PAKAI PARAMETER
       );
 
       if (success) {
@@ -167,6 +173,7 @@ class _BarcodeQrScanStockOpnameScreenState
       setState(() => _isSaving = false);
     }
   }
+
 
   void _showSuccessStatus(String title, String message) {
     setState(() {
@@ -251,6 +258,7 @@ class _BarcodeQrScanStockOpnameScreenState
     super.dispose();
   }
 
+
   void _processScanResult(String rawValue) async {
     // ⚡ Anti-duplikasi scan beruntun
     if (rawValue == _lastScannedCode) {
@@ -269,33 +277,72 @@ class _BarcodeQrScanStockOpnameScreenState
 
     try {
       final scanVM = context.read<StockOpnameScanViewModel>();
-      final result = await scanVM.validateLabel(rawValue, widget.blok!, widget.idLokasi, widget.noSO);
+      final result = await scanVM.validateLabel(
+        rawValue,
+        widget.blok!,
+        widget.idLokasi,
+        widget.noSO,
+      );
 
       setState(() => _isSaving = false);
 
-      if (result == null || result.labelType == null) {
+      // 🔴 VALIDASI GAGAL / RESPONSE ANEH
+      if (result == null) {
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
-        _showErrorStatus('Validasi Gagal', 'Label tidak dapat divalidasi\nLabel: $rawValue');
+        _showErrorStatus(
+          'Validasi Gagal',
+          'Label tidak dapat divalidasi\nLabel: $rawValue',
+        );
         return;
       }
+
+      // karena di model labelType non-nullable (String), cek empty saja:
+      if (result.labelType.isEmpty) {
+        _audioPlayer.play(AssetSource('sounds/denied.mp3'));
+        _showErrorStatus(
+          'Label Tidak Dikenali',
+          result.message.isNotEmpty ? result.message : 'Tipe label tidak diketahui',
+        );
+        return;
+      }
+
+      // 🔴 Duplikat
       if (result.isDuplicate) {
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
         _showErrorStatus('Label Duplikat!', result.message);
         return;
       }
+
+      // 🔴 Contoh rule khusus kamu sebelumnya
       if (!result.isValidCategory && result.foundInStockOpname) {
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
         _showErrorStatus('Kategori Tidak Sesuai', result.message);
         return;
       }
 
+      // 🟢 success == true → AUTO INSERT, TANPA DIALOG
+      if (result.success) {
+        await _saveLabel(
+          result.label,
+          result.jmlhSak ?? 0,
+          result.berat ?? 0.0,
+          result.idDiscrepancy,
+        );
+        return; // ⬅️ penting, jangan lanjut ke bottom sheet
+      }
+
+      // 🟡 success == false → TAMPILKAN DIALOG KONFIRMASI
       await _showConfirmBottomSheet(rawValue, result);
     } catch (e) {
       setState(() => _isSaving = false);
       _audioPlayer.play(AssetSource('sounds/denied.mp3'));
-      _showErrorStatus('Koneksi Bermasalah 📱', 'Periksa koneksi internet Anda');
+      _showErrorStatus(
+        'Koneksi Bermasalah 📱',
+        'Periksa koneksi internet Anda',
+      );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +358,7 @@ class _BarcodeQrScanStockOpnameScreenState
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
-          '$lokasiTitle | $count',
+          '$lokasiTitle ($count)',
           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white.withOpacity(0.9),

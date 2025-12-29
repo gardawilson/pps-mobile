@@ -16,7 +16,7 @@ class StockOpnameListScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          'Stock Opname List',
+          'Stock Opname',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -33,12 +33,17 @@ class StockOpnameListScreen extends StatelessWidget {
             return _buildLoading();
           }
 
-          if (viewModel.stockOpnameList.isEmpty) {
-            return _buildEmptyState(viewModel);
-          }
-
           if (viewModel.errorMessage.isNotEmpty) {
             return _buildErrorState(viewModel);
+          }
+
+          // ⬇️ HANYA TAMPILKAN isAscend == false
+          final visibleList = viewModel.stockOpnameList
+              .where((so) => so.isAscend == false)
+              .toList();
+
+          if (visibleList.isEmpty) {
+            return _buildEmptyState(viewModel);
           }
 
           return RefreshIndicator(
@@ -48,9 +53,9 @@ class StockOpnameListScreen extends StatelessWidget {
             color: const Color(0xFF0D47A1),
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: viewModel.stockOpnameList.length,
+              itemCount: visibleList.length,
               itemBuilder: (context, index) {
-                final stockOpname = viewModel.stockOpnameList[index];
+                final stockOpname = visibleList[index];
                 return _buildStockOpnameCard(context, stockOpname);
               },
               separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -58,6 +63,7 @@ class StockOpnameListScreen extends StatelessWidget {
           );
         },
       ),
+
     );
   }
 
@@ -92,6 +98,7 @@ class StockOpnameListScreen extends StatelessWidget {
                 builder: (context) => StockOpnameDetailScreen(
                   noSO: stockOpname.noSO,
                   tgl: stockOpname.tanggal,
+                  idWarehouse: stockOpname.idWarehouse, // ⬅️ baru
                 ),
               ),
             );

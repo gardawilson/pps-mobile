@@ -47,10 +47,11 @@ class LabelValidationResult {
   final bool isValidWarehouse;
   final bool isDuplicate;
   final bool foundInStockOpname;
-  final bool canInsert;
+  final int? idDiscrepancy;
   final int? idWarehouse;
   final int? jmlhSak;
   final double? berat;
+  final String? blok;
   final String? idLokasi;
   final List<MesinInfo> mesinInfo; // <== Tambahan
 
@@ -67,10 +68,11 @@ class LabelValidationResult {
     required this.isValidWarehouse,
     required this.isDuplicate,
     required this.foundInStockOpname,
-    required this.canInsert,
+    this.idDiscrepancy,
     this.idWarehouse,
     this.jmlhSak,
     this.berat,
+    this.blok,
     this.idLokasi,
     this.mesinInfo = const [],
   });
@@ -89,10 +91,11 @@ class LabelValidationResult {
       isValidWarehouse: json['isValidWarehouse'] ?? false,
       isDuplicate: json['isDuplicate'] ?? false,
       foundInStockOpname: json['foundInStockOpname'] ?? false,
-      canInsert: json['canInsert'] ?? false,
+      idDiscrepancy: json['idDiscrepancy'],
       idWarehouse: json['idWarehouse'],
       jmlhSak: json['jmlhSak'],
       berat: json['berat'] != null ? (json['berat'] as num).toDouble() : null,
+      blok: json['blok']?.toString(),
       idLokasi: json['idLokasi']?.toString(),
       mesinInfo: (json['mesinInfo'] as List<dynamic>?)
           ?.map((e) => MesinInfo.fromJson(e))
@@ -115,10 +118,11 @@ class LabelValidationResult {
       'isValidWarehouse': isValidWarehouse,
       'isDuplicate': isDuplicate,
       'foundInStockOpname': foundInStockOpname,
-      'canInsert': canInsert,
+      'idDiscrepancy': idDiscrepancy,
       'idWarehouse': idWarehouse,
       'jmlhSak': jmlhSak,
       'berat': berat,
+      'blok': blok,
       'idLokasi': idLokasi,
       'mesinInfo': mesinInfo.map((e) => e.toJson()).toList(),
     };
@@ -140,7 +144,7 @@ class LabelValidationResult {
         'message: $message, '
         'label: $label, '
         'labelType: $labelType, '
-        'canInsert: $canInsert, '
+        'idDiscrepancy: $idDiscrepancy, '
         'isDuplicate: $isDuplicate, '
         'foundInStockOpname: $foundInStockOpname, '
         'isValidFormat: $isValidFormat, '
@@ -149,6 +153,7 @@ class LabelValidationResult {
         'idWarehouse: $idWarehouse, '
         'jmlhSak: $jmlhSak, '
         'berat: $berat, '
+        'blok: $blok, '
         'idLokasi: $idLokasi, '
         'mesinInfo: $mesinInfo'
         '}';

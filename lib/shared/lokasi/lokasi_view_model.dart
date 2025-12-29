@@ -10,13 +10,18 @@ class LokasiViewModel extends ChangeNotifier {
   bool isLoading = false;
   String errorMessage = '';
 
-  Future<void> fetchLokasiList() async {
+  String? _lastIdWarehouseFilter; // ⬅️ opsional, kalau mau di-remember
+
+  Future<void> fetchLokasiList({String? idWarehouse}) async {
     isLoading = true;
     errorMessage = '';
+    _lastIdWarehouseFilter = idWarehouse;
     notifyListeners();
 
     try {
-      lokasiList = await repository.fetchLokasiList();
+      lokasiList = await repository.fetchLokasiList(
+        idWarehouse: idWarehouse,
+      );
     } catch (e, st) {
       errorMessage = e.toString();
       lokasiList = [];
@@ -26,5 +31,10 @@ class LokasiViewModel extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// (opsional) buat refresh pakai filter terakhir
+  Future<void> refresh() async {
+    return fetchLokasiList(idWarehouse: _lastIdWarehouseFilter);
   }
 }

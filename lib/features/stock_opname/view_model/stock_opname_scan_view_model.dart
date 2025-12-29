@@ -56,6 +56,7 @@ class StockOpnameScanViewModel extends ChangeNotifier {
     required double berat,
     required String blok,
     required int idLokasi,
+    final int? idDiscrepancy,
   }) async {
     final token = await _getToken();
     if (token == null) {
@@ -83,6 +84,7 @@ class StockOpnameScanViewModel extends ChangeNotifier {
           'berat': berat,
           'idlokasi': idLokasi,
           'blok': blok,
+          'idDiscrepancy': idDiscrepancy,
         }),
       );
 
