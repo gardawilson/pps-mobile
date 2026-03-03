@@ -1,7 +1,7 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../core/network/network_mode_config.dart';
 
 class ApiConstants {
-  static String get baseUrl => dotenv.env['API_BASE_URL'] ?? '';
+  static String get baseUrl => NetworkModeConfig.apiBaseUrl;
 
   static String get changePassword => '$baseUrl/api/change-password';
   static String get login => '$baseUrl/api/auth/login2';
@@ -11,7 +11,8 @@ class ApiConstants {
   static String get listNyangkut => '$baseUrl/api/nyangkut-list';
   static String get mstLokasi => '$baseUrl/api/mst-lokasi';
 
-  static String scanLabel(String noSO) => '$baseUrl/api/no-stock-opname/$noSO/scan';
+  static String scanLabel(String noSO) =>
+      '$baseUrl/api/no-stock-opname/$noSO/scan';
 
   static String labelData(String noLabel) => '$baseUrl/api/label-data/$noLabel';
 
@@ -20,18 +21,21 @@ class ApiConstants {
     required int page,
     required int pageSize,
     String? filterBy,
-    String? blok,         // opsional
-    int? idLokasi,        // int? biar konsisten dengan model/VM
-    String? search,       // opsional
+    String? blok, // opsional
+    int? idLokasi, // int? biar konsisten dengan model/VM
+    String? search, // opsional
   }) {
     final params = <String, String>{
-      'page'         : '$page',
-      'pageSize'     : '$pageSize',
-      'filterBy'     : filterBy ?? 'all',
-      'idLokasi'     : (idLokasi == null || idLokasi == 0) ? 'all' : idLokasi.toString(),
-      'filterbyuser' : 'true', // hardcode di sini
+      'page': '$page',
+      'pageSize': '$pageSize',
+      'filterBy': filterBy ?? 'all',
+      'idLokasi': (idLokasi == null || idLokasi == 0)
+          ? 'all'
+          : idLokasi.toString(),
+      'filterbyuser': 'true', // hardcode di sini
       if (blok != null && blok.isNotEmpty) 'blok': blok,
-      if (search != null && search.isNotEmpty) 'search': Uri.encodeQueryComponent(search),
+      if (search != null && search.isNotEmpty)
+        'search': Uri.encodeQueryComponent(search),
     };
 
     final query = Uri(queryParameters: params).query;
@@ -59,5 +63,4 @@ class ApiConstants {
     final currentLocation = idLokasi ?? 'all';
     return '$baseUrl/api/label-list?page=$page&pageSize=$loadMoreSize&filterBy=$currentFilter&idlokasi=$currentLocation';
   }
-
 }

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/auth/permission_view_model.dart';
+import '../../../core/network/network_mode_config.dart';
 import '../../../core/ui/error_presenter.dart';
 import '../../update/model/update_model.dart';
 import '../model/user_model.dart';
 import '../view_model/login_view_model.dart';
 import 'widgets/login_error_banner.dart';
+import 'widgets/network_mode_bottom_sheet.dart';
 
 import '../../update/view_model/update_view_model.dart';
 import '../../update/view/widgets/update_auto_sheet.dart';
@@ -32,11 +34,14 @@ class _LoginScreenState extends State<LoginScreen>
   late Animation<double> _fadeAnimation;
 
   bool _isPasswordVisible = false;
+  NetworkMode _selectedNetworkMode = NetworkModeConfig.currentMode;
 
   // ✅ State update yang diperluas
   bool _isCheckingUpdate = false;
-  bool _lockLoginUi = true; // ✅ Default TRUE - blokir login sampai update check selesai
-  bool _hasCompletedUpdateCheck = false; // ✅ Track apakah update check sudah selesai
+  bool _lockLoginUi =
+      true; // ✅ Default TRUE - blokir login sampai update check selesai
+  bool _hasCompletedUpdateCheck =
+      false; // ✅ Track apakah update check sudah selesai
   String? _updateError; // ✅ Simpan error message jika ada
 
   // state login
@@ -49,11 +54,52 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
     _initAnimations();
+    _selectedNetworkMode = NetworkModeConfig.currentMode;
 
     // ✅ Langsung check update saat init
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkForUpdatesWithRetry();
     });
+  }
+
+  Future<void> _onNetworkModeChanged(NetworkMode mode) async {
+    if (mode == _selectedNetworkMode) return;
+
+    setState(() {
+      _selectedNetworkMode = mode;
+      _errorMessage = '';
+      _errorType = '';
+      _detailCode = '';
+      _updateError = null;
+    });
+
+    await NetworkModeConfig.setMode(mode);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Mode jaringan: ${NetworkModeConfig.currentModeLabel}'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    await _checkForUpdatesWithRetry();
+  }
+
+  Future<void> _showNetworkModeSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => NetworkModeBottomSheet(
+        selectedMode: _selectedNetworkMode,
+        isSelectionLocked: _isLoading || _isCheckingUpdate,
+        onSelectMode: _onNetworkModeChanged,
+      ),
+    );
   }
 
   void _initAnimations() {
@@ -188,15 +234,16 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 28),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange.shade700,
+                size: 28,
+              ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
                   'Update Dibatalkan',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -281,15 +328,16 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           title: Row(
             children: [
-              Icon(Icons.system_update, color: Colors.orange.shade700, size: 28),
+              Icon(
+                Icons.system_update,
+                color: Colors.orange.shade700,
+                size: 28,
+              ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
                   'Update Diperlukan',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -378,10 +426,7 @@ class _LoginScreenState extends State<LoginScreen>
               const Expanded(
                 child: Text(
                   'Gagal Cek Update',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -505,7 +550,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-
   Future<void> _login() async {
     // ✅ Blokir login jika belum selesai update check
     if (_lockLoginUi || _isCheckingUpdate || !_hasCompletedUpdateCheck) {
@@ -575,7 +619,7 @@ class _LoginScreenState extends State<LoginScreen>
     } catch (_) {
       setState(() {
         _errorMessage =
-        'Login berhasil, tapi gagal membuka halaman Home. Pastikan route "/home" terdaftar.';
+            'Login berhasil, tapi gagal membuka halaman Home. Pastikan route "/home" terdaftar.';
         _errorType = 'server';
         _detailCode = 'route_missing';
       });
@@ -777,6 +821,25 @@ class _LoginScreenState extends State<LoginScreen>
             const _GradientBackground(),
 
             Positioned(
+              top: 44,
+              right: 18,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Material(
+                  color: Colors.white.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(12),
+                  child: IconButton(
+                    tooltip: 'Pengaturan jaringan',
+                    icon: const Icon(Icons.settings, color: Colors.white),
+                    onPressed: (_isLoading || _isCheckingUpdate)
+                        ? null
+                        : _showNetworkModeSheet,
+                  ),
+                ),
+              ),
+            ),
+
+            Positioned(
               top: 150,
               left: 0,
               right: 0,
@@ -881,16 +944,19 @@ class _LoginScreenState extends State<LoginScreen>
               decoration: InputDecoration(
                 labelText: 'Username',
                 prefixIcon: const Icon(Icons.person_outline),
-                border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey[300]!),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                  const BorderSide(color: Color(0xFF0D47A1), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF0D47A1),
+                    width: 2,
+                  ),
                 ),
               ),
             ),
@@ -906,23 +972,28 @@ class _LoginScreenState extends State<LoginScreen>
               decoration: InputDecoration(
                 labelText: 'Password',
                 prefixIcon: const Icon(Icons.lock_outline),
-                border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey[300]!),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                  const BorderSide(color: Color(0xFF0D47A1), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF0D47A1),
+                    width: 2,
+                  ),
                 ),
                 suffixIcon: IconButton(
-                  icon: Icon(_isPasswordVisible
-                      ? Icons.visibility
-                      : Icons.visibility_off),
-                  onPressed: () => setState(
-                          () => _isPasswordVisible = !_isPasswordVisible),
+                  icon: Icon(
+                    _isPasswordVisible
+                        ? Icons.visibility
+                        : Icons.visibility_off,
+                  ),
+                  onPressed: () =>
+                      setState(() => _isPasswordVisible = !_isPasswordVisible),
                 ),
               ),
             ),
@@ -931,7 +1002,9 @@ class _LoginScreenState extends State<LoginScreen>
               duration: const Duration(milliseconds: 200),
               child: _errorMessage.isNotEmpty
                   ? LoginErrorBanner(
-                  message: _errorMessage, errorType: _errorType)
+                      message: _errorMessage,
+                      errorType: _errorType,
+                    )
                   : const SizedBox.shrink(),
             ),
 
@@ -947,23 +1020,26 @@ class _LoginScreenState extends State<LoginScreen>
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey[300],
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 2,
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2.5,
-                  ),
-                )
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
                     : const Text(
-                  'Login',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600),
-                ),
+                        'Login',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -983,10 +1059,7 @@ class _GradientBackground extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF6D4D8C),
-            Color(0xFFF9A825),
-          ],
+          colors: [Color(0xFF6D4D8C), Color(0xFFF9A825)],
         ),
       ),
     );
