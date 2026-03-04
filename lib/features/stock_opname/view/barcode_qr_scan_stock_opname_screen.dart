@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import '../../../core/network/network_mode_config.dart';
 import '../view_model/stock_opname_scan_view_model.dart';
 import '../view_model/stock_opname_detail_view_model.dart';
 import 'package:vibration/vibration.dart';
@@ -10,6 +11,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../model/label_validation_result.dart';
 import '../widget/confirmation_label_stock_opname_dialog.dart';
 import '../widget/input_detail_label_stock_opname_dialog.dart';
+import '../../login/view/widgets/network_mode_bottom_sheet.dart';
 import '../../../widgets/scan_notification.dart';
 import '../../../widgets/status_indicator.dart';
 
@@ -35,7 +37,6 @@ class BarcodeQrScanStockOpnameScreen extends StatefulWidget {
 class _BarcodeQrScanStockOpnameScreenState
     extends State<BarcodeQrScanStockOpnameScreen>
     with SingleTickerProviderStateMixin {
-
   // ✅ Controller dengan konfigurasi optimal untuk QR Code
   late final MobileScannerController cameraController;
 
@@ -46,10 +47,12 @@ class _BarcodeQrScanStockOpnameScreenState
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   bool _isSaving = false;
+  bool _isValidatingServer = false;
   String _saveMessage = '';
   String _detailedMessage = '';
   bool _isSuccess = false;
   bool _showStatusIndicator = false;
+  NetworkMode _selectedNetworkMode = NetworkModeConfig.currentMode;
 
   Timer? _debounceTimer;
   String? _lastScannedCode;
@@ -57,6 +60,7 @@ class _BarcodeQrScanStockOpnameScreenState
   @override
   void initState() {
     super.initState();
+    _selectedNetworkMode = NetworkModeConfig.currentMode;
 
     // ✅ Konfigurasi controller untuk scan cepat QR Code
     cameraController = MobileScannerController(
@@ -84,7 +88,10 @@ class _BarcodeQrScanStockOpnameScreenState
     )..repeat(reverse: true);
   }
 
-  Future<void> _showConfirmBottomSheet(String label, LabelValidationResult result) async {
+  Future<void> _showConfirmBottomSheet(
+    String label,
+    LabelValidationResult result,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -99,7 +106,12 @@ class _BarcodeQrScanStockOpnameScreenState
           result: result,
           onConfirm: () async {
             Navigator.of(ctx).pop();
-            await _saveLabel(label, result.jmlhSak ?? 0, result.berat ?? 0, result.idDiscrepancy);
+            await _saveLabel(
+              label,
+              result.jmlhSak ?? 0,
+              result.berat ?? 0,
+              result.idDiscrepancy,
+            );
           },
           onManualInput: () async {
             Navigator.of(ctx).pop();
@@ -121,11 +133,11 @@ class _BarcodeQrScanStockOpnameScreenState
   }
 
   Future<void> _saveLabel(
-      String label,
-      int jmlhSak,
-      double berat,
-      int? idDiscrepancy,
-      ) async {
+    String label,
+    int jmlhSak,
+    double berat,
+    int? idDiscrepancy,
+  ) async {
     setState(() {
       _isSaving = true;
       _saveMessage = 'Menyimpan data...';
@@ -173,7 +185,6 @@ class _BarcodeQrScanStockOpnameScreenState
       setState(() => _isSaving = false);
     }
   }
-
 
   void _showSuccessStatus(String title, String message) {
     setState(() {
@@ -228,6 +239,39 @@ class _BarcodeQrScanStockOpnameScreenState
     }
   }
 
+  Future<void> _onNetworkModeChanged(NetworkMode mode) async {
+    if (mode == _selectedNetworkMode) return;
+    setState(() {
+      _selectedNetworkMode = mode;
+    });
+
+    await NetworkModeConfig.setMode(mode);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Mode jaringan: ${NetworkModeConfig.currentModeLabel}'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _showNetworkModeSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => NetworkModeBottomSheet(
+        selectedMode: _selectedNetworkMode,
+        isSelectionLocked: _isSaving || _isValidatingServer,
+        onSelectMode: _onNetworkModeChanged,
+      ),
+    );
+  }
+
   Future<void> _getCameraPermission() async {
     final status = await Permission.camera.request();
     setState(() => hasCameraPermission = status == PermissionStatus.granted);
@@ -238,7 +282,9 @@ class _BarcodeQrScanStockOpnameScreenState
           content: const Text('Izin kamera diperlukan untuk scanning'),
           backgroundColor: Colors.orange,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           action: SnackBarAction(
             label: 'Buka Pengaturan',
             textColor: Colors.white,
@@ -258,7 +304,6 @@ class _BarcodeQrScanStockOpnameScreenState
     super.dispose();
   }
 
-
   void _processScanResult(String rawValue) async {
     // ⚡ Anti-duplikasi scan beruntun
     if (rawValue == _lastScannedCode) {
@@ -269,9 +314,11 @@ class _BarcodeQrScanStockOpnameScreenState
 
     setState(() {
       _isSaving = true;
-      _saveMessage = 'Memvalidasi label...';
-      _detailedMessage = '';
-      _isSuccess = false;
+      _isValidatingServer = true;
+      // Tampilkan jelas: scan sukses, sekarang tunggu API.
+      _saveMessage = 'QR berhasil dibaca';
+      _detailedMessage = 'Menghubungi server untuk validasi label...';
+      _isSuccess = true;
       _showStatusIndicator = false;
     });
 
@@ -284,7 +331,10 @@ class _BarcodeQrScanStockOpnameScreenState
         widget.noSO,
       );
 
-      setState(() => _isSaving = false);
+      setState(() {
+        _isSaving = false;
+        _isValidatingServer = false;
+      });
 
       // 🔴 VALIDASI GAGAL / RESPONSE ANEH
       if (result == null) {
@@ -301,7 +351,9 @@ class _BarcodeQrScanStockOpnameScreenState
         _audioPlayer.play(AssetSource('sounds/denied.mp3'));
         _showErrorStatus(
           'Label Tidak Dikenali',
-          result.message.isNotEmpty ? result.message : 'Tipe label tidak diketahui',
+          result.message.isNotEmpty
+              ? result.message
+              : 'Tipe label tidak diketahui',
         );
         return;
       }
@@ -334,7 +386,10 @@ class _BarcodeQrScanStockOpnameScreenState
       // 🟡 success == false → TAMPILKAN DIALOG KONFIRMASI
       await _showConfirmBottomSheet(rawValue, result);
     } catch (e) {
-      setState(() => _isSaving = false);
+      setState(() {
+        _isSaving = false;
+        _isValidatingServer = false;
+      });
       _audioPlayer.play(AssetSource('sounds/denied.mp3'));
       _showErrorStatus(
         'Koneksi Bermasalah 📱',
@@ -343,11 +398,11 @@ class _BarcodeQrScanStockOpnameScreenState
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    final scanAreaSize = screen.width * 0.6;
+    // Area scan dibuat lebih besar agar kamera tidak perlu terlalu presisi.
+    final scanAreaSize = (screen.width * 0.82).clamp(260.0, screen.width - 28);
     final count = context.read<StockOpnameDetailViewModel>().totalData;
 
     final lokasiTitle = widget.blok == null || widget.blok!.isEmpty
@@ -359,14 +414,26 @@ class _BarcodeQrScanStockOpnameScreenState
       appBar: AppBar(
         title: Text(
           '$lokasiTitle ($count)',
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white.withOpacity(0.9),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
-            icon: Icon(isFlashOn ? Icons.flash_off : Icons.flash_on, color: Colors.black),
+            icon: const Icon(Icons.settings_outlined, color: Colors.black),
+            onPressed: (_isSaving || _isValidatingServer)
+                ? null
+                : _showNetworkModeSheet,
+          ),
+          IconButton(
+            icon: Icon(
+              isFlashOn ? Icons.flash_off : Icons.flash_on,
+              color: Colors.black,
+            ),
             onPressed: () async {
               try {
                 await cameraController.toggleTorch();
@@ -391,22 +458,27 @@ class _BarcodeQrScanStockOpnameScreenState
           // ✅ Camera dengan controller yang sudah dikonfigurasi
           if (hasCameraPermission)
             MobileScanner(
-              controller: cameraController, // ⭐ Gunakan controller yang sudah optimal
+              controller:
+                  cameraController, // ⭐ Gunakan controller yang sudah optimal
               scanWindow: Rect.fromCenter(
                 center: Offset(screen.width / 2, screen.height / 2),
-                width: scanAreaSize * 0.95,
-                height: scanAreaSize * 0.95,
+                width: scanAreaSize,
+                height: scanAreaSize,
               ),
               onDetect: (capture) {
                 try {
+                  // Saat API sedang diproses, abaikan deteksi baru.
+                  if (_isSaving) return;
+
                   final codes = capture.barcodes;
 
                   // ⚡ Filter cepat - ambil QR pertama
                   if (codes.isEmpty) return;
 
-                  // 🎯 Cari QR Code pertama yang valid
+                  // Semua label sekarang QR code, jadi baca QR saja.
                   final qrCode = codes.firstWhere(
-                        (b) => b.rawValue != null &&
+                    (b) =>
+                        b.rawValue != null &&
                         b.rawValue!.isNotEmpty &&
                         b.format == BarcodeFormat.qrCode,
                     orElse: () => Barcode(rawValue: null),
@@ -421,20 +493,68 @@ class _BarcodeQrScanStockOpnameScreenState
                     _animationController.forward(from: 0);
 
                     _debounceTimer?.cancel();
-                    _debounceTimer = Timer(const Duration(milliseconds: 200), () {
-                      if (!mounted) return;
-                      setState(() => _isDetected = false);
-                      _processScanResult(raw);
-                    });
+                    _debounceTimer = Timer(
+                      const Duration(milliseconds: 200),
+                      () {
+                        if (!mounted) return;
+                        setState(() => _isDetected = false);
+                        _processScanResult(raw);
+                      },
+                    );
                   }
                 } catch (e) {
                   debugPrint('❌ Error during QR detection: $e');
-                  _showErrorStatus('Error Scan 📱', 'Terjadi kesalahan saat memproses QR code');
+                  _showErrorStatus(
+                    'Error Scan 📱',
+                    'Terjadi kesalahan saat memproses QR code',
+                  );
                 }
               },
             )
           else
             _NoPermission(onRequest: _getCameraPermission),
+
+          if (_isValidatingServer)
+            Positioned.fill(
+              child: AbsorbPointer(
+                child: Container(
+                  color: Colors.black.withOpacity(0.45),
+                  child: Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.4),
+                          ),
+                          SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              'Memvalidasi ke server...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // Frame scan area
           Align(
@@ -446,20 +566,28 @@ class _BarcodeQrScanStockOpnameScreenState
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _isDetected ? Colors.greenAccent : Colors.white.withOpacity(0.5),
+                  color: _isDetected
+                      ? Colors.greenAccent
+                      : Colors.white.withOpacity(0.5),
                   width: 3,
                 ),
                 boxShadow: _isDetected
-                    ? [BoxShadow(color: Colors.greenAccent.withOpacity(0.5), blurRadius: 20, spreadRadius: 5)]
+                    ? [
+                        BoxShadow(
+                          color: Colors.greenAccent.withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ]
                     : null,
               ),
               child: _isDetected
                   ? Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(13),
-                  color: Colors.greenAccent.withOpacity(0.1),
-                ),
-              )
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(13),
+                        color: Colors.greenAccent.withOpacity(0.1),
+                      ),
+                    )
                   : null,
             ),
           ),
@@ -496,12 +624,7 @@ class _BarcodeQrScanStockOpnameScreenState
 
           // Hint
           if (_saveMessage.isEmpty && !_isSaving)
-            const Positioned(
-              bottom: 50,
-              left: 0,
-              right: 0,
-              child: _ScanHint(),
-            ),
+            const Positioned(bottom: 50, left: 0, right: 0, child: _ScanHint()),
         ],
       ),
     );
@@ -520,16 +643,24 @@ class _NoPermission extends StatelessWidget {
         children: [
           const Icon(Icons.camera_alt, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
-          Text('Izin kamera diperlukan untuk scanning',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]), textAlign: TextAlign.center),
+          Text(
+            'Izin kamera diperlukan untuk scanning',
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: onRequest,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Berikan Izin Kamera', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Berikan Izin Kamera',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),

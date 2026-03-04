@@ -63,10 +63,7 @@ class LoginErrorBanner extends StatelessWidget {
             Icon(_icon(), color: c, size: 20),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: c, fontSize: 13),
-              ),
+              child: Text(message, style: TextStyle(color: c, fontSize: 13)),
             ),
           ],
         ),

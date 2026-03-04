@@ -2,7 +2,7 @@ name: pps_mobile
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.24+1
+version: 1.0.31+1
 
 environment:
   sdk: ^3.8.0
@@ -45,7 +45,7 @@ dependencies:
   printing: ^5.5.0
   path_provider: ^2.0.11
   qr_flutter: ^4.0.0
-  audioplayers: ^6.4.0  # Versi terbaru yang dapat menangani versi http lebih baru
+  audioplayers: ^6.4.0 # Versi terbaru yang dapat menangani versi http lebih baru
   fluttertoast: ^8.0.9
   smb_connect: ^0.0.9
   package_info_plus: ^8.0.0
@@ -54,8 +54,6 @@ dependencies:
   lottie: ^2.7.0
   dio: ^5.7.0
   open_filex: ^4.5.0
-
-
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -93,7 +91,6 @@ flutter:
     - assets/animations/success.json
     - assets/animations/error.json
     - assets/animations/scan.json
-
 
     - .env
 
@@ -138,12 +135,12 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#ffffff"
-#  image: assets/icon/none.png
+  #  image: assets/icon/none.png
   color_dark: "#ffffff"
-#  image_dark: assets/icon/none.png
+  #  image_dark: assets/icon/none.png
 
   android_12:
-#    image: assets/icon/none.png
+    #    image: assets/icon/none.png
     icon_background_color: "#ffffff"
-#    image_dark: assets/icon/none.png
+    #    image_dark: assets/icon/none.png
     icon_background_color_dark: "#ffffff"

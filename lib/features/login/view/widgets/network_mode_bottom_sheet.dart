@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-
 import '../../../../core/network/network_mode_config.dart';
 
 class NetworkModeBottomSheet extends StatefulWidget {
@@ -28,28 +26,58 @@ class _NetworkModeBottomSheetState extends State<NetworkModeBottomSheet> {
   String _internalPing = '-';
   String _publicPing = '-';
   bool _isPinging = true;
+  bool _isRequestInFlight = false;
+  Timer? _autoRefreshTimer;
+  DateTime? _lastUpdatedAt;
 
   @override
   void initState() {
     super.initState();
-    _loadPing();
+    _loadPing(showLoading: true);
+    _startAutoRefresh();
   }
 
-  Future<void> _loadPing() async {
-    if (!mounted) return;
-    setState(() => _isPinging = true);
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
 
-    final results = await Future.wait([
-      _httpPing(NetworkModeConfig.internalApiBaseUrl),
-      _httpPing(NetworkModeConfig.publicApiBaseUrl),
-    ]);
-
-    if (!mounted) return;
-    setState(() {
-      _internalPing = results[0];
-      _publicPing = results[1];
-      _isPinging = false;
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _loadPing(showLoading: false);
     });
+  }
+
+  Future<void> _loadPing({required bool showLoading}) async {
+    if (!mounted) return;
+    if (_isRequestInFlight) return;
+
+    _isRequestInFlight = true;
+    if (showLoading) {
+      setState(() => _isPinging = true);
+    }
+
+    try {
+      final results = await Future.wait([
+        _httpPing(NetworkModeConfig.internalApiBaseUrl),
+        _httpPing(NetworkModeConfig.publicApiBaseUrl),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _internalPing = results[0];
+        _publicPing = results[1];
+        _lastUpdatedAt = DateTime.now();
+        if (showLoading) _isPinging = false;
+      });
+    } finally {
+      _isRequestInFlight = false;
+      if (showLoading && mounted) {
+        setState(() => _isPinging = false);
+      }
+    }
   }
 
   String _modeText(NetworkMode mode) {
@@ -216,6 +244,15 @@ class _NetworkModeBottomSheetState extends State<NetworkModeBottomSheet> {
     }
   }
 
+  String _lastUpdatedText() {
+    final dt = _lastUpdatedAt;
+    if (dt == null) return '-';
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final ss = dt.second.toString().padLeft(2, '0');
+    return '$hh:$mm:$ss';
+  }
+
   @override
   Widget build(BuildContext context) {
     final baseText = Theme.of(context).textTheme;
@@ -275,7 +312,9 @@ class _NetworkModeBottomSheetState extends State<NetworkModeBottomSheet> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.refresh),
-                      onPressed: _isPinging ? null : _loadPing,
+                      onPressed: _isPinging
+                          ? null
+                          : () => _loadPing(showLoading: true),
                     ),
                   ],
                 ),

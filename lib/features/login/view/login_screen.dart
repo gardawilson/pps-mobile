@@ -49,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen>
   String _errorType = '';
   String _detailCode = '';
   bool _isLoading = false;
+  int _updateRequestId = 0;
 
   @override
   void initState() {
@@ -96,8 +97,31 @@ class _LoginScreenState extends State<LoginScreen>
       ),
       builder: (_) => NetworkModeBottomSheet(
         selectedMode: _selectedNetworkMode,
-        isSelectionLocked: _isLoading || _isCheckingUpdate,
+        isSelectionLocked: _isLoading,
         onSelectMode: _onNetworkModeChanged,
+      ),
+    );
+  }
+
+  bool _isActiveUpdateRequest(int requestId) {
+    return mounted && requestId == _updateRequestId;
+  }
+
+  Widget _buildNetworkSettingsButton() {
+    return Positioned(
+      top: 44,
+      right: 18,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Material(
+          color: Colors.white.withOpacity(0.16),
+          borderRadius: BorderRadius.circular(12),
+          child: IconButton(
+            tooltip: 'Pengaturan jaringan',
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: _isLoading ? null : _showNetworkModeSheet,
+          ),
+        ),
       ),
     );
   }
@@ -119,6 +143,7 @@ class _LoginScreenState extends State<LoginScreen>
   /// ✅ Check update dengan retry mechanism - FIXED VERSION
   Future<void> _checkForUpdatesWithRetry() async {
     if (!mounted) return;
+    final requestId = ++_updateRequestId;
 
     setState(() {
       _isCheckingUpdate = true;
@@ -143,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen>
         print('❌ [LOGIN] Caught update check error: $errorMessage');
       }
 
-      if (!mounted) return;
+      if (!_isActiveUpdateRequest(requestId)) return;
 
       // ✅ Jika ada error, tampilkan dialog error
       if (hasError) {
@@ -182,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen>
         vm: _updateViewModel,
       );
 
-      if (!mounted) return;
+      if (!_isActiveUpdateRequest(requestId)) return;
 
       print('✅ [UPDATE] Update dialog closed. needsUpdate=$needsUpdate');
 
@@ -205,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen>
       }
     } catch (e) {
       // ✅ Catch unexpected errors
-      if (!mounted) return;
+      if (!_isActiveUpdateRequest(requestId)) return;
 
       print('❌ [LOGIN] Unexpected error in update flow: $e');
 
@@ -292,6 +317,18 @@ class _LoginScreenState extends State<LoginScreen>
             ],
           ),
           actions: [
+            if (_canSuggestPublicNetwork())
+              TextButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _onNetworkModeChanged(NetworkMode.public);
+                },
+                icon: const Icon(Icons.public),
+                label: const Text('Gunakan Public'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF175CD3),
+                ),
+              ),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
@@ -498,6 +535,18 @@ class _LoginScreenState extends State<LoginScreen>
             ],
           ),
           actions: [
+            if (_canSuggestPublicNetwork())
+              TextButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _onNetworkModeChanged(NetworkMode.public);
+                },
+                icon: const Icon(Icons.public),
+                label: const Text('Gunakan Public'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF175CD3),
+                ),
+              ),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
@@ -604,6 +653,14 @@ class _LoginScreenState extends State<LoginScreen>
           errorType: _errorType,
           detailCode: _detailCode,
           onRetry: _login,
+          suggestedActionLabel: _canSuggestPublicNetwork()
+              ? 'Gunakan Jaringan Public'
+              : null,
+          onSuggestedAction: _canSuggestPublicNetwork()
+              ? () {
+                  _onNetworkModeChanged(NetworkMode.public);
+                }
+              : null,
         );
       }
       return;
@@ -631,6 +688,11 @@ class _LoginScreenState extends State<LoginScreen>
       final permVm = context.read<PermissionViewModel>();
       await permVm.loadPermissions();
     } catch (_) {}
+  }
+
+  bool _canSuggestPublicNetwork() {
+    return _selectedNetworkMode == NetworkMode.internal &&
+        NetworkModeConfig.publicApiBaseUrl.trim().isNotEmpty;
   }
 
   void _clearErrorMessage() {
@@ -668,6 +730,7 @@ class _LoginScreenState extends State<LoginScreen>
         body: Stack(
           children: [
             const _GradientBackground(),
+            _buildNetworkSettingsButton(),
             Center(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -732,6 +795,7 @@ class _LoginScreenState extends State<LoginScreen>
         body: Stack(
           children: [
             const _GradientBackground(),
+            _buildNetworkSettingsButton(),
             Center(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -820,24 +884,7 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             const _GradientBackground(),
 
-            Positioned(
-              top: 44,
-              right: 18,
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Material(
-                  color: Colors.white.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(12),
-                  child: IconButton(
-                    tooltip: 'Pengaturan jaringan',
-                    icon: const Icon(Icons.settings, color: Colors.white),
-                    onPressed: (_isLoading || _isCheckingUpdate)
-                        ? null
-                        : _showNetworkModeSheet,
-                  ),
-                ),
-              ),
-            ),
+            _buildNetworkSettingsButton(),
 
             Positioned(
               top: 150,

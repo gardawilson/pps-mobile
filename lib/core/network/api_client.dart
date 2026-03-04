@@ -33,16 +33,14 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> postJson(
-      String urlOrPath, {
-        required Map<String, dynamic> body,
-        bool useAuth = false,
-        Duration timeout = defaultTimeout,
-      }) async {
+    String urlOrPath, {
+    required Map<String, dynamic> body,
+    bool useAuth = false,
+    Duration timeout = defaultTimeout,
+  }) async {
     final uri = _buildUri(urlOrPath);
     try {
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
+      final headers = <String, String>{'Content-Type': 'application/json'};
 
       if (useAuth) {
         final token = await _getToken();
@@ -85,15 +83,13 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> getJson(
-      String urlOrPath, {
-        bool useAuth = false,
-        Duration timeout = defaultTimeout,
-      }) async {
+    String urlOrPath, {
+    bool useAuth = false,
+    Duration timeout = defaultTimeout,
+  }) async {
     final uri = _buildUri(urlOrPath);
     try {
-      final headers = <String, String>{
-        'Accept': 'application/json',
-      };
+      final headers = <String, String>{'Accept': 'application/json'};
 
       if (useAuth) {
         final token = await _getToken();
