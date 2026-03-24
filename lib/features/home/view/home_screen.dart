@@ -4,7 +4,6 @@ import '../../profile/view_model/user_profile_view_model.dart';
 import '../../profile/view/user_profile_dialog.dart';
 
 class HomeScreen extends StatelessWidget {
-
   // Fungsi untuk menampilkan dialog ganti password
   void _showChangePasswordDialog(BuildContext context) {
     showDialog(
@@ -26,10 +25,7 @@ class HomeScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text(
             'Home',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           backgroundColor: const Color(0xFF0D47A1), // BLUE THEME
           elevation: 0,
@@ -49,10 +45,7 @@ class HomeScreen extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                const Color(0xFF0D47A1).withOpacity(0.05),
-                Colors.white,
-              ],
+              colors: [const Color(0xFF0D47A1).withOpacity(0.05), Colors.white],
             ),
           ),
           child: SingleChildScrollView(
@@ -128,17 +121,12 @@ class HomeScreen extends StatelessWidget {
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              Icons.dashboard,
-              size: 40,
-              color: Colors.white,
-            ),
+            child: Icon(Icons.dashboard, size: 40, color: Colors.white),
           ),
         ],
       ),
     );
   }
-
 
   Widget _buildStatisticsCards() {
     return Row(
@@ -214,10 +202,7 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             textAlign: TextAlign.center,
           ),
         ],
@@ -335,10 +320,7 @@ class HomeScreen extends StatelessWidget {
               ),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
             ],
           ),
@@ -382,6 +364,17 @@ class HomeScreen extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
+        _buildMenuCard(
+          context,
+          title: 'Penjualan BJ',
+          subtitle: 'Daftar penjualan barang jadi',
+          icon: Icons.sell_outlined,
+          color: const Color(0xFF0D47A1),
+          onTap: () {
+            Navigator.pushNamed(context, '/bj-jual');
+          },
+        ),
+        const SizedBox(height: 12),
         // _buildMenuCard(
         //   context,
         //   title: 'Akun',
@@ -396,21 +389,18 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-
   Widget _buildMenuCard(
-      BuildContext context, {
-        required String title,
-        required String subtitle,
-        required IconData icon,
-        required Color color,
-        required Function onTap,
-      }) {
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Function onTap,
+  }) {
     return Card(
       elevation: 4,
       shadowColor: Colors.black.withOpacity(0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
         onTap: () => onTap(),
         contentPadding: const EdgeInsets.all(20),
@@ -420,11 +410,7 @@ class HomeScreen extends StatelessWidget {
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 28,
-          ),
+          child: Icon(icon, color: color, size: 28),
         ),
         title: Text(
           title,
@@ -436,10 +422,7 @@ class HomeScreen extends StatelessWidget {
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
         ),
         trailing: Container(
           padding: const EdgeInsets.all(8),
@@ -447,11 +430,7 @@ class HomeScreen extends StatelessWidget {
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            Icons.arrow_forward_ios,
-            color: color,
-            size: 16,
-          ),
+          child: Icon(Icons.arrow_forward_ios, color: color, size: 16),
         ),
       ),
     );

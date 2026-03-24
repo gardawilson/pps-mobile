@@ -10,22 +10,27 @@ class StockOpnameScanViewModel extends ChangeNotifier {
   String saveMessage = '';
   int? lastStatusCode;
 
-  /// Ambil token dari SharedPreferences
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token');
   }
 
-  /// Validasi label
-  Future<LabelValidationResult?> validateLabel(String label, String blok, int idlokasi, String noSO) async {
+  Future<LabelValidationResult?> validateLabel(
+    String label,
+    String blok,
+    int idlokasi,
+    String noSO,
+  ) async {
     final token = await _getToken();
     if (token == null) {
-      debugPrint('❌ Token tidak tersedia');
+      debugPrint('Token tidak tersedia');
       return null;
     }
 
-    final url = Uri.parse('${ApiConstants.baseUrl}/api/no-stock-opname/$noSO/validate-label');
-    debugPrint('📤 Request validate-label => $url | label: $label');
+    final url =
+        Uri.parse('${ApiConstants.baseUrl}/api/no-stock-opname/$noSO/validate-label');
+    debugPrint('[HTTP] POST $url');
+    debugPrint('Request validate-label => $url | label: $label');
 
     try {
       final response = await http.post(
@@ -34,21 +39,20 @@ class StockOpnameScanViewModel extends ChangeNotifier {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({'label': label, 'blok': blok,'idlokasi': idlokasi}),
+        body: json.encode({'label': label, 'blok': blok, 'idlokasi': idlokasi}),
       );
 
-      debugPrint('📥 Response [${response.statusCode}]: ${response.body}');
+      debugPrint('[HTTP] POST $url -> ${response.statusCode}');
+      debugPrint('Response [${response.statusCode}]: ${response.body}');
 
       final jsonResponse = json.decode(response.body);
       return LabelValidationResult.fromJson(jsonResponse);
-
     } catch (e) {
-      debugPrint('❌ Exception validateLabel: $e');
+      debugPrint('Exception validateLabel: $e');
       return null;
     }
   }
 
-  /// Insert label ke stock opname
   Future<bool> insertLabel({
     required String label,
     required String noSO,
@@ -56,20 +60,24 @@ class StockOpnameScanViewModel extends ChangeNotifier {
     required double berat,
     required String blok,
     required int idLokasi,
-    final int? idDiscrepancy,
+    int? idDiscrepancy,
   }) async {
     final token = await _getToken();
     if (token == null) {
-      debugPrint('❌ Token tidak tersedia untuk insert');
+      debugPrint('Token tidak tersedia untuk insert');
       return false;
     }
 
     isSaving = true;
     notifyListeners();
 
-    final url = Uri.parse('${ApiConstants.baseUrl}/api/no-stock-opname/$noSO/insert-label');
-    debugPrint('📤 Request insert-label => $url');
-    debugPrint('📤 Body: label=$label, jmlhSak=$jmlhSak, berat=$berat, idlokasi=$idLokasi');
+    final url =
+        Uri.parse('${ApiConstants.baseUrl}/api/no-stock-opname/$noSO/insert-label');
+    debugPrint('[HTTP] POST $url');
+    debugPrint('Request insert-label => $url');
+    debugPrint(
+      'Body: label=$label, jmlhSak=$jmlhSak, berat=$berat, idlokasi=$idLokasi',
+    );
 
     try {
       final response = await http.post(
@@ -88,7 +96,8 @@ class StockOpnameScanViewModel extends ChangeNotifier {
         }),
       );
 
-      debugPrint('📥 Insert Response [${response.statusCode}]: ${response.body}');
+      debugPrint('[HTTP] POST $url -> ${response.statusCode}');
+      debugPrint('Insert Response [${response.statusCode}]: ${response.body}');
 
       final success = response.statusCode == 200 || response.statusCode == 201;
       lastStatusCode = response.statusCode;
@@ -97,13 +106,12 @@ class StockOpnameScanViewModel extends ChangeNotifier {
         saveMessage = 'Data berhasil disimpan.';
       } else {
         saveMessage = 'Gagal menyimpan data. (${response.statusCode})';
-        // Log response body untuk debugging
-        debugPrint('❌ Insert failed response body: ${response.body}');
+        debugPrint('Insert failed response body: ${response.body}');
       }
 
       return success;
     } catch (e) {
-      debugPrint('❌ Insert error: $e');
+      debugPrint('Insert error: $e');
       saveMessage = 'Terjadi kesalahan: ${e.toString()}';
       return false;
     } finally {

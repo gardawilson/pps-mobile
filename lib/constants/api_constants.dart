@@ -53,6 +53,30 @@ class ApiConstants {
     return '$baseUrl/api/label-list?page=$page&pageSize=$pageSize&filterBy=$filter&idlokasi=$lokasi';
   }
 
+  static String bjJualList({
+    required int page,
+    required int pageSize,
+    String? search,
+    String? dateFrom,
+    String? dateTo,
+  }) {
+    final params = <String, String>{
+      'page': '$page',
+      'pageSize': '$pageSize',
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (dateFrom != null && dateFrom.isNotEmpty) 'dateFrom': dateFrom,
+      if (dateTo != null && dateTo.isNotEmpty) 'dateTo': dateTo,
+    };
+    final query = Uri(queryParameters: params).query;
+    return '$baseUrl/api/bj-jual?$query';
+  }
+
+  static String bjJualInputs(String noBJJual) =>
+      '$baseUrl/api/bj-jual/${Uri.encodeComponent(noBJJual)}/inputs';
+
+  static String lookupLabel(String labelCode) =>
+      '$baseUrl/api/production/lookup-label/${Uri.encodeComponent(labelCode)}';
+
   static String labelListLoadMore({
     required int page,
     required int loadMoreSize,

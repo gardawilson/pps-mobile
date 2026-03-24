@@ -8,8 +8,10 @@ class StockOpnameListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<StockOpnameViewModel>(context, listen: false)
-          .fetchStockOpname();
+      Provider.of<StockOpnameViewModel>(
+        context,
+        listen: false,
+      ).fetchStockOpname();
     });
 
     return Scaffold(
@@ -63,7 +65,6 @@ class StockOpnameListScreen extends StatelessWidget {
           );
         },
       ),
-
     );
   }
 
@@ -160,7 +161,10 @@ class StockOpnameListScreen extends StatelessWidget {
 
                 // Warehouse info
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue[50],
                     borderRadius: BorderRadius.circular(8),
@@ -207,7 +211,10 @@ class StockOpnameListScreen extends StatelessWidget {
                     runSpacing: 6,
                     children: activeProcesses.map((process) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: _getProcessColor(process).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -228,7 +235,10 @@ class StockOpnameListScreen extends StatelessWidget {
                   ),
                 ] else ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
@@ -327,10 +337,7 @@ class StockOpnameListScreen extends StatelessWidget {
             viewModel.errorMessage.isNotEmpty
                 ? viewModel.errorMessage
                 : 'No data available at the moment',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -365,11 +372,7 @@ class StockOpnameListScreen extends StatelessWidget {
               color: Colors.red[50],
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red[400],
-            ),
+            child: Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
           ),
           const SizedBox(height: 24),
           Text(
@@ -385,10 +388,7 @@ class StockOpnameListScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
               viewModel.errorMessage,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               textAlign: TextAlign.center,
             ),
           ),
@@ -414,5 +414,4 @@ class StockOpnameListScreen extends StatelessWidget {
   }
 
   Widget _buildLoading() => const LoadingSkeleton();
-
 }

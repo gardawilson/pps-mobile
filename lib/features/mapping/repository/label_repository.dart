@@ -1,5 +1,6 @@
 // lib/features/label/repository/label_repository.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../../constants/api_constants.dart';
 import '../../../../utils/token_storage.dart';
@@ -25,10 +26,12 @@ class LabelRepository {
 
     final uri = Uri.parse('${ApiConstants.baseUrl}/api/label/all')
         .replace(queryParameters: params);
+    debugPrint('[HTTP] GET $uri');
 
     final res = await http.get(uri, headers: {
       'Authorization': 'Bearer $token',
     });
+    debugPrint('[HTTP] GET $uri -> ${res.statusCode}');
 
     if (res.statusCode == 200) {
       final body = json.decode(res.body);

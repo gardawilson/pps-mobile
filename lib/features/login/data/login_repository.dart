@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../constants/api_constants.dart';
 import '../../../core/auth/permission_storage.dart';
+import '../../../core/network/network_mode_config.dart';
 import '../model/user_model.dart';
 import '../model/login_result.dart';
 
@@ -140,6 +141,7 @@ class LoginRepository {
 
     // NETWORK / CONNECTIVITY
     on TimeoutException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
       print('Timeout: $e');
       return LoginResult(
         success: false,
@@ -150,6 +152,7 @@ class LoginRepository {
     }
 
     on HandshakeException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
       print('SSL Handshake error: $e');
       return LoginResult(
         success: false,
@@ -160,6 +163,7 @@ class LoginRepository {
     }
 
     on http.ClientException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
       print('HTTP ClientException: $e');
       return LoginResult(
         success: false,
@@ -170,6 +174,7 @@ class LoginRepository {
     }
 
     on SocketException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
       final code = _socketDetail(e);
       final msg = _socketMessage(code);
       print('SocketException: ${e.message}');

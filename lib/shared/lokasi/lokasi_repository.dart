@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../constants/api_constants.dart';
 import '../../utils/token_storage.dart';
@@ -21,10 +22,12 @@ class LokasiRepository {
       'idWarehouse': idWarehouse.trim(),
     })
         : baseUri;
+    debugPrint('[HTTP] GET $url');
 
     final res = await http.get(url, headers: {
       'Authorization': 'Bearer $token',
     });
+    debugPrint('[HTTP] GET $url -> ${res.statusCode}');
 
     if (res.statusCode == 200) {
       final body = json.decode(res.body);

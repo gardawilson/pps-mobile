@@ -3,10 +3,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_errors.dart';
+import 'network_mode_config.dart';
 import '../../constants/api_constants.dart';
 
 class ApiClient {
@@ -39,6 +41,7 @@ class ApiClient {
     Duration timeout = defaultTimeout,
   }) async {
     final uri = _buildUri(urlOrPath);
+    _logRequest('POST', uri);
     try {
       final headers = <String, String>{'Content-Type': 'application/json'};
 
@@ -52,9 +55,11 @@ class ApiClient {
       final res = await _client
           .post(uri, headers: headers, body: jsonEncode(body))
           .timeout(timeout);
+      _logResponse('POST', uri, res.statusCode);
 
       return _handleJsonResponse(res);
     } on SocketException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
       final code = ApiFailure.socketDetail(e);
       throw ApiFailure(
         type: ApiFailureType.network,
@@ -62,12 +67,71 @@ class ApiClient {
         detailCode: code,
       );
     } on TimeoutException {
+      NetworkModeConfig.notifyNetworkFailure();
       throw ApiFailure(
         type: ApiFailureType.network,
         message: 'Server tidak merespons (timeout).',
         detailCode: 'timeout',
       );
     } on http.ClientException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
+      throw ApiFailure(
+        type: ApiFailureType.network,
+        message: 'Tidak dapat terhubung ke server. (${e.message})',
+        detailCode: 'network_error',
+      );
+    } catch (e) {
+      throw ApiFailure(
+        type: ApiFailureType.unknown,
+        message: 'Terjadi kesalahan tidak terduga: $e',
+        detailCode: 'unknown',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteJson(
+    String urlOrPath, {
+    required Map<String, dynamic> body,
+    bool useAuth = false,
+    Duration timeout = defaultTimeout,
+  }) async {
+    final uri = _buildUri(urlOrPath);
+    _logRequest('DELETE', uri);
+    try {
+      final headers = <String, String>{'Content-Type': 'application/json'};
+
+      if (useAuth) {
+        final token = await _getToken();
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+      }
+
+      final req = http.Request('DELETE', uri)
+        ..headers.addAll(headers)
+        ..body = jsonEncode(body);
+      final streamed = await _client.send(req).timeout(timeout);
+      final res = await http.Response.fromStream(streamed);
+      _logResponse('DELETE', uri, res.statusCode);
+
+      return _handleJsonResponse(res);
+    } on SocketException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
+      final code = ApiFailure.socketDetail(e);
+      throw ApiFailure(
+        type: ApiFailureType.network,
+        message: _socketMessage(code),
+        detailCode: code,
+      );
+    } on TimeoutException {
+      NetworkModeConfig.notifyNetworkFailure();
+      throw ApiFailure(
+        type: ApiFailureType.network,
+        message: 'Server tidak merespons (timeout).',
+        detailCode: 'timeout',
+      );
+    } on http.ClientException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
       throw ApiFailure(
         type: ApiFailureType.network,
         message: 'Tidak dapat terhubung ke server. (${e.message})',
@@ -88,6 +152,7 @@ class ApiClient {
     Duration timeout = defaultTimeout,
   }) async {
     final uri = _buildUri(urlOrPath);
+    _logRequest('GET', uri);
     try {
       final headers = <String, String>{'Accept': 'application/json'};
 
@@ -99,8 +164,10 @@ class ApiClient {
       }
 
       final res = await _client.get(uri, headers: headers).timeout(timeout);
+      _logResponse('GET', uri, res.statusCode);
       return _handleJsonResponse(res);
     } on SocketException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
       final code = ApiFailure.socketDetail(e);
       throw ApiFailure(
         type: ApiFailureType.network,
@@ -108,6 +175,7 @@ class ApiClient {
         detailCode: code,
       );
     } on TimeoutException {
+      NetworkModeConfig.notifyNetworkFailure();
       throw ApiFailure(
         type: ApiFailureType.network,
         message: 'Server tidak merespons (timeout).',
@@ -176,5 +244,13 @@ class ApiClient {
       default:
         return 'Tidak dapat terhubung ke server.';
     }
+  }
+
+  void _logRequest(String method, Uri uri) {
+    debugPrint('[HTTP] $method $uri');
+  }
+
+  void _logResponse(String method, Uri uri, int statusCode) {
+    debugPrint('[HTTP] $method $uri -> $statusCode');
   }
 }

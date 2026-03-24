@@ -38,12 +38,15 @@ class StockOpnameViewModel extends ChangeNotifier {
         return;
       }
 
+      final uri = Uri.parse(ApiConstants.listNoSO);
+      debugPrint('[HTTP] GET $uri');
       final response = await http.get(
-        Uri.parse(ApiConstants.listNoSO),
+        uri,
         headers: {
           'Authorization': 'Bearer $token', // Menambahkan token di header Authorization
         },
       );
+      debugPrint('[HTTP] GET $uri -> ${response.statusCode}');
 
       if (response.statusCode == 200) {
         // Parsing data jika status code OK (200)

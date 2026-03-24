@@ -38,8 +38,10 @@ class UserProfileViewModel extends ChangeNotifier {
     }
 
     try {
+      final uri = Uri.parse(ApiConstants.changePassword);
+      debugPrint('[HTTP] POST $uri');
       final response = await http.post(
-        Uri.parse(ApiConstants.changePassword),
+        uri,
         headers: {
           'Authorization': 'Bearer $token', // Menambahkan token di header Authorization
           'Content-Type': 'application/json',
@@ -50,6 +52,7 @@ class UserProfileViewModel extends ChangeNotifier {
           'confirmPassword': userProfile.confirmPassword,
         }),
       );
+      debugPrint('[HTTP] POST $uri -> ${response.statusCode}');
 
       if (response.statusCode == 200) {
         _successMessage = 'Password berhasil diganti';

@@ -1,5 +1,6 @@
 // lib/features/label/repository/label_mapping_repository.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../constants/api_constants.dart';
 import '../../../utils/token_storage.dart';
@@ -26,6 +27,7 @@ class LabelMappingRepository {
   }) async {
     final token = await TokenStorage.getToken();
     final uri = Uri.parse('${ApiConstants.baseUrl}/api/label/update-lokasi');
+    debugPrint('[HTTP] POST $uri');
 
     final res = await http.post(
       uri,
@@ -39,6 +41,7 @@ class LabelMappingRepository {
         'blok': blok,
       }),
     );
+    debugPrint('[HTTP] POST $uri -> ${res.statusCode}');
 
     // Backend kamu bisa return 200 (sukses) atau 404 (label tidak ditemukan)
     if (res.statusCode == 200 || res.statusCode == 404) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../constants/api_constants.dart';
 import '../../../utils/token_storage.dart';
@@ -8,10 +9,12 @@ class BlokRepository {
   Future<List<Blok>> fetchBlokList() async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('${ApiConstants.baseUrl}/api/blok');
+    debugPrint('[HTTP] GET $url');
 
     final response = await http.get(url, headers: {
       'Authorization': 'Bearer $token',
     });
+    debugPrint('[HTTP] GET $url -> ${response.statusCode}');
 
     if (response.statusCode == 200) {
       final body = json.decode(response.body);

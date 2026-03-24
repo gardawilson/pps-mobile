@@ -11,6 +11,9 @@ import 'core/network/network_mode_config.dart';
 import 'features/home/view/home_screen.dart';
 import 'features/login/view/login_screen.dart';
 import 'features/profile/view_model/user_profile_view_model.dart';
+import 'features/bj_jual/view/bj_jual_list_screen.dart';
+import 'features/bj_jual/view_model/bj_jual_detail_view_model.dart';
+import 'features/bj_jual/view_model/bj_jual_list_view_model.dart';
 import 'features/stock_opname/view/stock_opname_list_screen.dart';
 import 'features/stock_opname/view_model/stock_opname_detail_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_list_view_model.dart';
@@ -20,6 +23,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await NetworkModeConfig.initialize();
+  NetworkModeConfig.attachNetworkChangeListener();
   runApp(MyApp());
 }
 
@@ -34,6 +38,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LokasiViewModel(repository: LokasiRepository())),
         ChangeNotifierProvider(create: (_) => StockOpnameScanViewModel()),
         ChangeNotifierProvider(create: (_) => BlokViewModel(repository: BlokRepository())),
+        ChangeNotifierProvider(create: (_) => BjJualListViewModel()),
+        ChangeNotifierProvider(create: (_) => BjJualDetailViewModel()),
       ],
       child: MaterialApp(
         title: 'PPS Mobile',
@@ -46,6 +52,7 @@ class MyApp extends StatelessWidget {
           '/home': (context) => HomeScreen(),
           '/stockopname': (context) => StockOpnameListScreen(),
           '/mapping': (context) => LabelScreen(),
+          '/bj-jual': (context) => const BjJualListScreen(),
         },
       ),
     );

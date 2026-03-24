@@ -137,10 +137,12 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
       // debug print
       // print('🌐 GET: $url');
 
+      debugPrint('[HTTP] GET $url');
       final resp = await http.get(
         url,
         headers: {'Authorization': 'Bearer $token'},
       );
+      debugPrint('[HTTP] GET $url -> ${resp.statusCode}');
 
       if (resp.statusCode == 200) {
         final body = json.decode(resp.body) as Map<String, dynamic>;
@@ -177,3 +179,4 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
     }
   }
 }
+

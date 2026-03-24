@@ -82,34 +82,37 @@ class _NetworkModeBottomSheetState extends State<NetworkModeBottomSheet> {
 
   String _modeText(NetworkMode mode) {
     switch (mode) {
+      case NetworkMode.auto:
+        return 'Auto (Prioritas Internal)';
       case NetworkMode.internal:
         return 'Internal';
       case NetworkMode.public:
         return 'Public';
-      case NetworkMode.auto:
-        return 'Internal';
     }
   }
 
   String _modeDescription(NetworkMode mode) {
     switch (mode) {
+      case NetworkMode.auto:
+        return 'Prioritaskan jaringan lokal, otomatis pindah ke public jika lokal lambat/tidak terjangkau';
       case NetworkMode.internal:
         return 'Pakai jaringan lokal perusahaan';
       case NetworkMode.public:
         return 'Pakai jaringan internet/public';
-      case NetworkMode.auto:
-        return 'Pakai jaringan lokal perusahaan';
     }
   }
 
   String _pingLabel(NetworkMode mode) {
     switch (mode) {
+      case NetworkMode.auto:
+        if (NetworkModeConfig.autoResolvedMode == NetworkMode.public) {
+          return 'Public: $_publicPing';
+        }
+        return 'Internal: $_internalPing';
       case NetworkMode.internal:
         return _internalPing;
       case NetworkMode.public:
         return _publicPing;
-      case NetworkMode.auto:
-        return _internalPing;
     }
   }
 
@@ -122,23 +125,23 @@ class _NetworkModeBottomSheetState extends State<NetworkModeBottomSheet> {
     if (_isPinging) return false;
 
     switch (mode) {
+      case NetworkMode.auto:
+        return !_isUnreachable(_internalPing) || !_isUnreachable(_publicPing);
       case NetworkMode.internal:
         return !_isUnreachable(_internalPing);
       case NetworkMode.public:
         return !_isUnreachable(_publicPing);
-      case NetworkMode.auto:
-        return !_isUnreachable(_internalPing);
     }
   }
 
   IconData _modeIcon(NetworkMode mode) {
     switch (mode) {
+      case NetworkMode.auto:
+        return Icons.auto_awesome_rounded;
       case NetworkMode.internal:
         return Icons.apartment_rounded;
       case NetworkMode.public:
         return Icons.public_rounded;
-      case NetworkMode.auto:
-        return Icons.apartment_rounded;
     }
   }
 
@@ -328,7 +331,11 @@ class _NetworkModeBottomSheetState extends State<NetworkModeBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...const [NetworkMode.internal, NetworkMode.public].map((mode) {
+                ...const [
+                  NetworkMode.auto,
+                  NetworkMode.internal,
+                  NetworkMode.public,
+                ].map((mode) {
                   final pingRaw = _pingLabel(mode);
                   final pingView = _pingView(pingRaw);
                   final isSelected = mode == widget.selectedMode;
