@@ -49,10 +49,22 @@ class StockOpnameViewModel extends ChangeNotifier {
       debugPrint('[HTTP] GET $uri -> ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        // Parsing data jika status code OK (200)
-        List<dynamic> data = json.decode(response.body);
-        _stockOpnameList = data.map((item) => StockOpname.fromJson(item)).toList();
-        _errorMessage = '';  // Kosongkan pesan error jika sukses
+        // API lama: langsung List
+        // API baru: object { data, total, page, limit }
+        final decoded = json.decode(response.body);
+        final List<dynamic> data;
+
+        if (decoded is List) {
+          data = decoded;
+        } else if (decoded is Map<String, dynamic> && decoded['data'] is List) {
+          data = decoded['data'] as List<dynamic>;
+        } else {
+          throw Exception('Format response stock opname tidak dikenali');
+        }
+
+        _stockOpnameList =
+            data.map((item) => StockOpname.fromJson(item as Map<String, dynamic>)).toList();
+        _errorMessage = ''; // Kosongkan pesan error jika sukses
       } else if (response.statusCode == 401) {
         // Jika token tidak valid atau kadaluarsa
         _errorMessage = 'Unauthorized: Token is invalid or expired';
@@ -64,8 +76,8 @@ class StockOpnameViewModel extends ChangeNotifier {
         _stockOpnameList = [];
       }
     } catch (error) {
-      // Menangani kesalahan koneksi
-      _errorMessage = 'Failed to connect to the server';
+      // Menangani parsing/format response maupun koneksi
+      _errorMessage = error.toString().replaceFirst('Exception: ', '');
       _stockOpnameList = [];
     } finally {
       _isLoading = false;

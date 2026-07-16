@@ -32,7 +32,8 @@ class StockOpnameDetailScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _StockOpnameDetailScreenState createState() => _StockOpnameDetailScreenState();
+  _StockOpnameDetailScreenState createState() =>
+      _StockOpnameDetailScreenState();
 }
 
 class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
@@ -57,9 +58,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
         idWarehouse: normalizedIdWarehouse,
       );
 
-      context
-          .read<StockOpnameDetailViewModel>()
-          .fetchInitialData(widget.noSO);
+      context.read<StockOpnameDetailViewModel>().fetchInitialData(widget.noSO);
     });
 
     _scrollController.addListener(_onScroll);
@@ -84,10 +83,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.noSO,
-          style: const TextStyle(color: Colors.white),
-        ),
+        title: Text(widget.noSO, style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF0D47A1),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -176,9 +172,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
               }
 
               // Expandable card item
-              return StockOpnameExpandableCard(
-                item: vm.labels[index],
-              );
+              return StockOpnameExpandableCard(item: vm.labels[index]);
             },
           ),
         );
@@ -273,11 +267,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   }
 
   Widget _buildSummaryDivider() {
-    return Container(
-      width: 1,
-      height: 40,
-      color: Colors.grey.shade200,
-    );
+    return Container(width: 1, height: 40, color: Colors.grey.shade200);
   }
 
   Widget _buildFilterDropdown() {
@@ -394,7 +384,10 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   void _showScanBarQRCode(BuildContext context) {
     if (_selectedIdLokasi == null || _selectedIdLokasi == 0) {
       showErrorStatusDialog(
-          context, 'Pilih lokasi dulu!', 'Silakan pilih lokasi terlebih dahulu sebelum melakukan scan / input label');
+        context,
+        'Pilih lokasi dulu!',
+        'Silakan pilih lokasi terlebih dahulu sebelum melakukan scan / input label',
+      );
       return;
     }
 
@@ -416,7 +409,10 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
 
     if (_selectedIdLokasi == null || _selectedIdLokasi == 0) {
       showErrorStatusDialog(
-          context, 'Pilih lokasi dulu!', 'Silakan pilih lokasi terlebih dahulu sebelum melakukan scan / input label');
+        context,
+        'Pilih lokasi dulu!',
+        'Silakan pilih lokasi terlebih dahulu sebelum melakukan scan / input label',
+      );
       return;
     }
 
@@ -425,23 +421,38 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
       builder: (context) => InputIdLabelStockOpnameDialog(
         onSubmit: (label) async {
           final result = await scanVM.validateLabel(
-              label, _selectedBlok!, _selectedIdLokasi!, widget.noSO);
+            label,
+            _selectedBlok!,
+            _selectedIdLokasi!,
+            widget.noSO,
+          );
 
-          if (result == null || result.labelType == null || result.labelType.isEmpty) {
+          if (result == null ||
+              result.labelType == null ||
+              result.labelType.isEmpty) {
             showErrorStatusDialog(
-                context, 'Validasi gagal', 'Tidak dapat memvalidasi label: $label');
+              context,
+              'Validasi gagal',
+              'Tidak dapat memvalidasi label: $label',
+            );
             return;
           }
 
           if (result.isDuplicate) {
             showErrorStatusDialog(
-                context, 'Label Duplikat', '${result.message} Label: $label');
+              context,
+              'Label Duplikat',
+              '${result.message} Label: $label',
+            );
             return;
           }
 
           if (!result.isValidCategory) {
             showErrorStatusDialog(
-                context, 'Kategori Tidak Valid', '${result.message} Label: $label');
+              context,
+              'Kategori Tidak Valid',
+              '${result.message} Label: $label',
+            );
             return;
           }
 
@@ -451,7 +462,11 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
     );
   }
 
-  void showErrorStatusDialog(BuildContext context, String title, String message) {
+  void showErrorStatusDialog(
+    BuildContext context,
+    String title,
+    String message,
+  ) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -459,7 +474,10 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
     );
   }
 
-  Future<void> _showConfirmDialog(String label, LabelValidationResult result) async {
+  Future<void> _showConfirmDialog(
+    String label,
+    LabelValidationResult result,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -496,9 +514,14 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   }
 
   Future<void> _saveLabel(String label, int jmlhSak, double berat) async {
-    final scanVM = Provider.of<StockOpnameScanViewModel>(context, listen: false);
-    final detailVM =
-    Provider.of<StockOpnameDetailViewModel>(context, listen: false);
+    final scanVM = Provider.of<StockOpnameScanViewModel>(
+      context,
+      listen: false,
+    );
+    final detailVM = Provider.of<StockOpnameDetailViewModel>(
+      context,
+      listen: false,
+    );
 
     showDialog(
       context: context,
@@ -519,7 +542,10 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
       Navigator.of(context).pop();
 
       if (success) {
-        detailVM.fetchInitialData(widget.noSO, filterBy: _selectedFilter ?? 'all');
+        detailVM.fetchInitialData(
+          widget.noSO,
+          filterBy: _selectedFilter ?? 'all',
+        );
 
         showDialog(
           context: context,
@@ -573,10 +599,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
           ),
           const Text(':'),
           const SizedBox(width: 8),
-          Expanded(
-            flex: 3,
-            child: Text(value),
-          ),
+          Expanded(flex: 3, child: Text(value)),
         ],
       ),
     );
