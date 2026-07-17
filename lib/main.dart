@@ -18,16 +18,33 @@ import 'features/stock_opname/view/stock_opname_list_screen.dart';
 import 'features/stock_opname/view_model/stock_opname_detail_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_list_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_scan_view_model.dart';
+import 'features/stock_opname_v2/view/so_v2_category_screen.dart';
+
+const String appEnvironment = String.fromEnvironment(
+  'APP_ENV',
+  defaultValue: 'development',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+  final envFile = switch (appEnvironment) {
+    'development' => '.env.development',
+    'production' => '.env.production',
+    _ => throw UnsupportedError(
+      'APP_ENV tidak valid: "$appEnvironment". '
+      'Gunakan "development" atau "production".',
+    ),
+  };
+
+  await dotenv.load(fileName: envFile);
   await NetworkModeConfig.initialize();
   NetworkModeConfig.attachNetworkChangeListener();
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -35,22 +52,25 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StockOpnameViewModel()),
         ChangeNotifierProvider(create: (_) => StockOpnameDetailViewModel()),
         ChangeNotifierProvider(create: (_) => UserProfileViewModel()),
-        ChangeNotifierProvider(create: (_) => LokasiViewModel(repository: LokasiRepository())),
+        ChangeNotifierProvider(
+          create: (_) => LokasiViewModel(repository: LokasiRepository()),
+        ),
         ChangeNotifierProvider(create: (_) => StockOpnameScanViewModel()),
-        ChangeNotifierProvider(create: (_) => BlokViewModel(repository: BlokRepository())),
+        ChangeNotifierProvider(
+          create: (_) => BlokViewModel(repository: BlokRepository()),
+        ),
         ChangeNotifierProvider(create: (_) => BjJualListViewModel()),
         ChangeNotifierProvider(create: (_) => BjJualDetailViewModel()),
       ],
       child: MaterialApp(
         title: 'PPS Mobile',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-        ),
+        theme: ThemeData(primarySwatch: Colors.blue),
         initialRoute: '/',
         routes: {
           '/': (context) => const LoginScreen(),
           '/home': (context) => HomeScreen(),
           '/stockopname': (context) => StockOpnameListScreen(),
+          '/stockopname-v2': (context) => const SoV2CategoryScreen(),
           '/mapping': (context) => LabelScreen(),
           '/bj-jual': (context) => const BjJualListScreen(),
         },

@@ -355,6 +355,17 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 12),
         _buildMenuCard(
           context,
+          title: 'Stock Opname V2',
+          subtitle: 'Stock opname berdasarkan kategori dan lokasi',
+          icon: Icons.inventory_2_outlined,
+          color: const Color(0xFF1565C0),
+          onTap: () {
+            Navigator.pushNamed(context, '/stockopname-v2');
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildMenuCard(
+          context,
           title: 'Mapping',
           subtitle: 'Kelola posisi item',
           icon: Icons.location_on,

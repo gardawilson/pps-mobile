@@ -47,4 +47,6 @@ app.*.map.json
 # Environment files
 .env
 .env.*
+!.env.development
+!.env.production
 

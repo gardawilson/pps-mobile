@@ -43,20 +43,22 @@ APP_ID="mobile"
 
 DEV_IP="192.168.11.153"
 PROD_IP="192.168.11.79"
-PUBLIC_HOST="pps.padmoasm.com"
 PORT="7500"
 
 DEV_SERVER="http://$DEV_IP:$PORT"
 PROD_SERVER="http://$PROD_IP:$PORT"
-PUBLIC_SERVER="http://$PUBLIC_HOST"
 
 if [ "$MODE" == "dev" ]; then
-  API_BASE_URL="$DEV_SERVER"
+  APP_ENV="development"
+  ENV_FILE=".env.development"
+  PUBLISH_SERVER="$DEV_SERVER"
 else
-  API_BASE_URL="$PROD_SERVER"
+  APP_ENV="production"
+  ENV_FILE=".env.production"
+  PUBLISH_SERVER="$PROD_SERVER"
 fi
 
-PUBLISH_URL="$API_BASE_URL/api/update/$APP_ID/publish"
+PUBLISH_URL="$PUBLISH_SERVER/api/update/$APP_ID/publish"
 
 # --- Validation ---
 if [ -z "$CHANGELOG" ]; then
@@ -91,7 +93,8 @@ echo "=================================================="
 echo " PPS Mobile — Deploy Script"
 echo "=================================================="
 echo " Mode        : $MODE"
-echo " Server      : $API_BASE_URL"
+echo " App Env     : $APP_ENV ($ENV_FILE)"
+echo " Server      : $PUBLISH_SERVER"
 echo " Version     : $CURRENT_VERSION+$CURRENT_BUILD → $NEXT_VERSION+$NEXT_BUILD"
 echo " Min Version : $MIN_VERSION"
 echo " Force Update: $FORCE_UPDATE"
@@ -116,35 +119,20 @@ echo "[1/5] Updating version in pubspec.yaml..."
 sed -i "s/^version: .*/version: $NEXT_VERSION+$NEXT_BUILD/" pubspec.yaml
 echo "      Done: $CURRENT_VERSION+$CURRENT_BUILD → $NEXT_VERSION+$NEXT_BUILD"
 
-# --- Step 2: Set .env ---
+# --- Step 2: Validate env file ---
 echo ""
-echo "[2/5] Setting .env ($MODE)..."
-
-if [ "$MODE" == "dev" ]; then
-  INTERNAL_URL="$DEV_SERVER"
-else
-  INTERNAL_URL="$PROD_SERVER"
+echo "[2/5] Validating environment ($APP_ENV)..."
+if [ ! -f "$ENV_FILE" ]; then
+  echo "      ERROR: $ENV_FILE tidak ditemukan"
+  exit 1
 fi
 
-cat > .env << EOF
-API_BASE_URL_INTERNAL=$INTERNAL_URL
-UPDATE_BASE_URL_INTERNAL=$INTERNAL_URL
-API_BASE_URL_PUBLIC=$PUBLIC_SERVER
-UPDATE_BASE_URL_PUBLIC=$PUBLIC_SERVER
-DEFAULT_NETWORK_MODE=auto
-
-# Backward compatibility (opsional)
-API_BASE_URL=$INTERNAL_URL
-UPDATE_BASE_URL=$INTERNAL_URL
-APP_ID=$APP_ID
-EOF
-
-echo "      Done: .env → internal=$INTERNAL_URL | public=$PUBLIC_SERVER"
+echo "      Done: using $ENV_FILE"
 
 # --- Step 3: Build APK release ---
 echo ""
 echo "[3/5] Building APK release (this may take a few minutes)..."
-flutter build apk --release
+flutter build apk --release --dart-define=APP_ENV="$APP_ENV"
 echo "      Done: APK built"
 
 # --- Step 4: Show APK info ---
