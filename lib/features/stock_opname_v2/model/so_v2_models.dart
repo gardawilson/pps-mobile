@@ -72,39 +72,12 @@ class SoV2Kategori {
   }
 }
 
-class SoV2Blok {
-  const SoV2Blok({
-    required this.blok,
-    required this.locationCount,
-    required this.labelCount,
-    required this.scannedCount,
-    required this.totalQuantity,
-  });
-
-  final String blok;
-  final int locationCount;
-  final int labelCount;
-  final int scannedCount;
-  final double totalQuantity;
-
-  double get progress => labelCount == 0 ? 0 : scannedCount / labelCount;
-
-  factory SoV2Blok.fromJson(Map<String, dynamic> json) {
-    return SoV2Blok(
-      blok: _asString(json['blok']),
-      locationCount: _asInt(json['locationCount']),
-      labelCount: _asInt(json['labelCount']),
-      scannedCount: _asInt(json['scannedCount']),
-      totalQuantity: _asDouble(json['totalWeight'] ?? json['totalPcs']),
-    );
-  }
-}
-
 const String soV2UnknownBlok = 'TIDAK_DIKETAHUI';
 const int soV2UnknownLocationId = 0;
 
 class SoV2Lokasi {
   const SoV2Lokasi({
+    required this.blok,
     required this.locationId,
     required this.description,
     required this.labelCount,
@@ -112,6 +85,7 @@ class SoV2Lokasi {
     required this.totalQuantity,
   });
 
+  final String blok;
   final int locationId;
   final String description;
   final int labelCount;
@@ -123,6 +97,7 @@ class SoV2Lokasi {
 
   factory SoV2Lokasi.fromJson(Map<String, dynamic> json) {
     return SoV2Lokasi(
+      blok: _asString(json['blok']),
       locationId: _asInt(json['locationId'] ?? json['IdLokasi']),
       description: _asString(
         json['description'] ?? json['Description'] ?? json['Keterangan'],

@@ -21,23 +21,10 @@ class SoV2Repository {
     }
   }
 
-  Future<List<SoV2Blok>> fetchBlok(String stockOpnameNo) async {
+  Future<SoV2LokasiPage> fetchLokasi(String stockOpnameNo) async {
     try {
       final response = await _apiClient.getJson(
-        '/api/stock-opname-v2/transaksi/${Uri.encodeComponent(stockOpnameNo)}/blok',
-        useAuth: true,
-      );
-      return _mapList(response['data']).map(SoV2Blok.fromJson).toList();
-    } on ApiFailure catch (error) {
-      if (error.statusCode == 404) return [];
-      rethrow;
-    }
-  }
-
-  Future<SoV2LokasiPage> fetchLokasi(String stockOpnameNo, String blok) async {
-    try {
-      final response = await _apiClient.getJson(
-        '/api/stock-opname-v2/transaksi/${Uri.encodeComponent(stockOpnameNo)}/blok/${Uri.encodeComponent(blok)}/lokasi',
+        '/api/stock-opname-v2/transaksi/${Uri.encodeComponent(stockOpnameNo)}/lokasi',
         useAuth: true,
       );
       return SoV2LokasiPage.fromJson(_map(response['data']));

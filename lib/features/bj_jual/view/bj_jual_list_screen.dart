@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../shared/components/app_drawer.dart';
 import '../../../widgets/loading_skeleton.dart';
 import '../model/bj_jual_model.dart';
 import '../view/bj_jual_detail_screen.dart';
@@ -44,6 +45,7 @@ class _BjJualListScreenState extends State<BjJualListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
+      drawer: const AppDrawer(currentRoute: '/bj-jual'),
       appBar: AppBar(
         title: const Text(
           'Penjualan BJ',

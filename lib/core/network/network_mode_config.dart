@@ -83,30 +83,29 @@ class NetworkModeConfig {
 
   static String get apiBaseUrl {
     _ensureInitialized();
-    switch (_currentMode) {
-      case NetworkMode.internal:
-        return _internalApiUrl;
-      case NetworkMode.public:
-        return _publicApiUrl;
-      case NetworkMode.auto:
-        return _resolvedAutoMode == NetworkMode.public
-            ? _publicApiUrl
-            : _internalApiUrl;
-    }
+    final preferPublic = switch (_currentMode) {
+      NetworkMode.public => true,
+      NetworkMode.internal => false,
+      NetworkMode.auto => _resolvedAutoMode == NetworkMode.public,
+    };
+    final chosen = preferPublic ? _publicApiUrl : _internalApiUrl;
+    // Mode tersimpan bisa menunjuk ke URL yang belum dikonfigurasi (mis. mode
+    // "public" tersimpan permanen padahal env saat ini tidak punya public
+    // URL) -> jatuh balik ke URL lain yang tersedia daripada macet permanen.
+    if (chosen.isNotEmpty) return chosen;
+    return preferPublic ? _internalApiUrl : _publicApiUrl;
   }
 
   static String get updateBaseUrl {
     _ensureInitialized();
-    switch (_currentMode) {
-      case NetworkMode.internal:
-        return _internalUpdateUrl;
-      case NetworkMode.public:
-        return _publicUpdateUrl;
-      case NetworkMode.auto:
-        return _resolvedAutoMode == NetworkMode.public
-            ? _publicUpdateUrl
-            : _internalUpdateUrl;
-    }
+    final preferPublic = switch (_currentMode) {
+      NetworkMode.public => true,
+      NetworkMode.internal => false,
+      NetworkMode.auto => _resolvedAutoMode == NetworkMode.public,
+    };
+    final chosen = preferPublic ? _publicUpdateUrl : _internalUpdateUrl;
+    if (chosen.isNotEmpty) return chosen;
+    return preferPublic ? _internalUpdateUrl : _publicUpdateUrl;
   }
 
   static String get internalApiBaseUrl => _internalApiUrl;

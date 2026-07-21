@@ -5,28 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vibration/vibration.dart';
-
 import '../../../core/network/api_errors.dart';
-import '../repository/so_v2_repository.dart';
+import '../repository/mapping_v2_repository.dart';
 
-class SoV2ScanScreen extends StatefulWidget {
-  const SoV2ScanScreen({
+class MappingV2ScanScreen extends StatefulWidget {
+  const MappingV2ScanScreen({
     super.key,
-    required this.stockOpnameNo,
     required this.blok,
-    required this.locationId,
+    required this.idLokasi,
   });
 
-  final String stockOpnameNo;
   final String blok;
-  final int locationId;
+  final int idLokasi;
 
   @override
-  State<SoV2ScanScreen> createState() => _SoV2ScanScreenState();
+  State<MappingV2ScanScreen> createState() => _MappingV2ScanScreenState();
 }
 
-class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
-  final SoV2Repository _repository = SoV2Repository();
+class _MappingV2ScanScreenState extends State<MappingV2ScanScreen> {
+  final MappingV2Repository _repository = MappingV2Repository();
   final MobileScannerController _scannerController = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
@@ -102,29 +99,19 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
     }
   }
 
-  Future<void> _submitLabel(String labelNo) async {
+  Future<void> _submitLabel(String labelCode) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
     try {
-      final response = await _repository.submitResult(
-        stockOpnameNo: widget.stockOpnameNo,
-        labelNo: labelNo,
-        palletNo: '',
+      final result = await _repository.updateLokasi(
+        labelCode: labelCode,
         blok: widget.blok,
-        locationId: widget.locationId,
+        idLokasi: widget.idLokasi,
       );
       await Vibration.vibrate(duration: 80);
       unawaited(_audioPlayer.play(AssetSource('sounds/accepted.mp3')));
       if (!mounted) return;
-      final data = response['data'] as Map<String, dynamic>;
-      final details = <String>[
-        if (data['weight'] != null) '${data['weight']} kg',
-        if (data['pieceCount'] != null) '${data['pieceCount']} pcs',
-        if (data['sackCount'] != null) '${data['sackCount']} sak',
-      ];
-      _showMessage(
-        '${response['message']}${details.isEmpty ? '' : '\n${details.join(' · ')}'}',
-      );
+      _showMessage(result.message, isError: false);
     } catch (e) {
       await Vibration.vibrate(pattern: [0, 180, 100, 180]);
       unawaited(_audioPlayer.play(AssetSource('sounds/denied.mp3')));
@@ -163,18 +150,7 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black87,
         foregroundColor: Colors.white,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Scan Stock Opname V2'),
-            Text(
-              widget.locationId == 0
-                  ? 'Lokasi tidak diketahui'
-                  : '${widget.blok}${widget.locationId}',
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
+        title: Text('Scan ${widget.blok}${widget.idLokasi}'),
         actions: [
           IconButton(
             tooltip: 'Flash',

@@ -90,6 +90,62 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> putJson(
+    String urlOrPath, {
+    required Map<String, dynamic> body,
+    bool useAuth = false,
+    Duration timeout = defaultTimeout,
+  }) async {
+    final uri = _buildUri(urlOrPath);
+    _logRequest('PUT', uri);
+    try {
+      final headers = <String, String>{'Content-Type': 'application/json'};
+
+      if (useAuth) {
+        final token = await _getToken();
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+      }
+
+      final res = await _client
+          .put(uri, headers: headers, body: jsonEncode(body))
+          .timeout(timeout);
+      _logResponse('PUT', uri, res.statusCode);
+
+      return _handleJsonResponse(res);
+    } on SocketException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
+      final code = ApiFailure.socketDetail(e);
+      throw ApiFailure(
+        type: ApiFailureType.network,
+        message: _socketMessage(code),
+        detailCode: code,
+      );
+    } on TimeoutException {
+      NetworkModeConfig.notifyNetworkFailure();
+      throw ApiFailure(
+        type: ApiFailureType.network,
+        message: 'Server tidak merespons (timeout).',
+        detailCode: 'timeout',
+      );
+    } on http.ClientException catch (e) {
+      NetworkModeConfig.notifyNetworkFailure();
+      throw ApiFailure(
+        type: ApiFailureType.network,
+        message: 'Tidak dapat terhubung ke server. (${e.message})',
+        detailCode: 'network_error',
+      );
+    } catch (e) {
+      if (e is ApiFailure) rethrow;
+      throw ApiFailure(
+        type: ApiFailureType.unknown,
+        message: 'Terjadi kesalahan tidak terduga: $e',
+        detailCode: 'unknown',
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> deleteJson(
     String urlOrPath, {
     Map<String, dynamic>? body,

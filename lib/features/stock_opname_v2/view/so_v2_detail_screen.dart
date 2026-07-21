@@ -12,10 +12,12 @@ class SoV2DetailScreen extends StatefulWidget {
     super.key,
     required this.stockOpnameNo,
     required this.categoryCode,
+    required this.categoryName,
   });
 
   final String stockOpnameNo;
   final String categoryCode;
+  final String categoryName;
 
   @override
   State<SoV2DetailScreen> createState() => _SoV2DetailScreenState();
@@ -26,6 +28,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _labelScrollController = ScrollController();
   Timer? _searchDebounce;
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -33,7 +36,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     _viewModel = SoV2DetailViewModel(
       stockOpnameNo: widget.stockOpnameNo,
       categoryCode: widget.categoryCode,
-    )..loadBlocks();
+    )..loadLocations();
     _labelScrollController.addListener(_onLabelScroll);
   }
 
@@ -83,28 +86,38 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 
   void _handleBack(SoV2DetailViewModel viewModel) {
+    if (_isSearching) {
+      _closeSearch(viewModel);
+      return;
+    }
     if (viewModel.selectedLocation != null) {
       _searchController.clear();
       viewModel.backToLocations();
       return;
     }
-    if (viewModel.selectedBlock != null) {
-      viewModel.backToBlocks();
-      return;
-    }
     Navigator.of(context).pop();
   }
 
+  void _openSearch() {
+    setState(() => _isSearching = true);
+  }
+
+  void _closeSearch(SoV2DetailViewModel viewModel) {
+    setState(() => _isSearching = false);
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    viewModel.setSearch('');
+  }
+
   Future<void> _openScanner(SoV2DetailViewModel viewModel) async {
-    final block = viewModel.selectedBlock;
     final location = viewModel.selectedLocation;
-    if (block == null || location == null) return;
+    if (location == null) return;
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => SoV2ScanScreen(
           stockOpnameNo: widget.stockOpnameNo,
-          blok: block.blok,
+          blok: location.blok,
           locationId: location.locationId,
         ),
       ),
@@ -125,10 +138,16 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     if (viewModel.selectedLocation != null) {
       return viewModel.loadLabels(reset: true);
     }
-    if (viewModel.selectedBlock != null) {
-      return viewModel.selectBlock(viewModel.selectedBlock!);
-    }
-    return viewModel.loadBlocks();
+    return viewModel.loadLocations();
+  }
+
+  String _appBarTitle(SoV2DetailViewModel viewModel) {
+    final location = viewModel.selectedLocation;
+    if (location == null) return widget.categoryName;
+    final locationText = location.isUnknown
+        ? 'Lokasi Tidak Diketahui'
+        : '${location.blok}${location.locationId}';
+    return '${widget.categoryName} ($locationText)';
   }
 
   @override
@@ -139,9 +158,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         builder: (context, viewModel, _) {
           final isLabelStep = viewModel.selectedLocation != null;
           return PopScope(
-            canPop:
-                viewModel.selectedBlock == null &&
-                viewModel.selectedLocation == null,
+            canPop: viewModel.selectedLocation == null,
             onPopInvokedWithResult: (didPop, _) {
               if (!didPop) _handleBack(viewModel);
             },
@@ -154,34 +171,49 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                   onPressed: () => _handleBack(viewModel),
                   icon: const Icon(Icons.arrow_back),
                 ),
-                title: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _pageTitle(viewModel),
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
+                title: _isSearching
+                    ? TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white),
+                        cursorColor: Colors.white,
+                        decoration: const InputDecoration(
+                          hintText: 'Cari nomor label...',
+                          hintStyle: TextStyle(color: Colors.white70),
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (value) =>
+                            _onSearchChanged(value, viewModel),
+                      )
+                    : Text(
+                        _appBarTitle(viewModel),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      _pageSubtitle(viewModel),
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ],
-                ),
+                actions: isLabelStep
+                    ? [
+                        IconButton(
+                          onPressed: _isSearching
+                              ? () => _closeSearch(viewModel)
+                              : _openSearch,
+                          icon: Icon(_isSearching ? Icons.close : Icons.search),
+                        ),
+                      ]
+                    : null,
               ),
               body: RefreshIndicator(
                 onRefresh: () => _refreshCurrentStep(viewModel),
                 child: _buildCurrentStep(viewModel),
               ),
               floatingActionButton: isLabelStep && !viewModel.isComplete
-                  ? FloatingActionButton.extended(
+                  ? FloatingActionButton(
                       backgroundColor: const Color(0xFF0D47A1),
                       foregroundColor: Colors.white,
                       onPressed: () => _openScanner(viewModel),
-                      icon: const Icon(Icons.qr_code_scanner),
-                      label: const Text('Scan Label'),
+                      child: const Icon(Icons.qr_code_scanner),
                     )
                   : null,
             ),
@@ -191,74 +223,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     );
   }
 
-  String _pageTitle(SoV2DetailViewModel viewModel) {
-    if (viewModel.selectedLocation != null) return 'Daftar Label';
-    if (viewModel.selectedBlock != null) return 'Pilih Lokasi';
-    return 'Pilih Blok';
-  }
-
-  String _pageSubtitle(SoV2DetailViewModel viewModel) {
-    final block = viewModel.selectedBlock;
-    final location = viewModel.selectedLocation;
-    if (location != null && block != null) {
-      final locationText = location.isUnknown
-          ? 'Lokasi tidak diketahui'
-          : '${block.blok}${location.locationId}';
-      return '${widget.stockOpnameNo} · $locationText';
-    }
-    if (block != null) {
-      final blockText = block.blok == soV2UnknownBlok
-          ? 'Tanpa blok'
-          : 'Blok ${block.blok}';
-      return '${widget.stockOpnameNo} · $blockText';
-    }
-    return widget.stockOpnameNo;
-  }
-
   Widget _buildCurrentStep(SoV2DetailViewModel viewModel) {
     if (viewModel.selectedLocation != null) {
       return _buildLabelStep(viewModel);
     }
-    if (viewModel.selectedBlock != null) {
-      return _buildLocationStep(viewModel);
-    }
-    return _buildBlockStep(viewModel);
-  }
-
-  Widget _buildBlockStep(SoV2DetailViewModel viewModel) {
-    if (viewModel.isLoadingBlocks && viewModel.blocks.isEmpty) {
-      return const _LoadingList(message: 'Memuat daftar blok...');
-    }
-    if (viewModel.error != null && viewModel.blocks.isEmpty) {
-      return _ErrorList(
-        message: viewModel.error!,
-        onRetry: viewModel.loadBlocks,
-      );
-    }
-    if (viewModel.blocks.isEmpty) {
-      return const _EmptyList(
-        icon: Icons.grid_view_outlined,
-        message: 'Belum ada blok pada stock opname ini.',
-      );
-    }
-
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      children: [
-        const _StepHeader(
-          step: 1,
-          title: 'Pilih Blok',
-          description: 'Pilih blok tempat proses stock opname dilakukan.',
-        ),
-        const SizedBox(height: 14),
-        for (final block in viewModel.blocks)
-          _BlockMenuCard(
-            block: block,
-            onTap: () => viewModel.selectBlock(block),
-          ),
-      ],
-    );
+    return _buildLocationStep(viewModel);
   }
 
   Widget _buildLocationStep(SoV2DetailViewModel viewModel) {
@@ -268,13 +237,13 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     if (viewModel.error != null && viewModel.locations.isEmpty) {
       return _ErrorList(
         message: viewModel.error!,
-        onRetry: () => viewModel.selectBlock(viewModel.selectedBlock!),
+        onRetry: viewModel.loadLocations,
       );
     }
     if (viewModel.locations.isEmpty) {
       return const _EmptyList(
         icon: Icons.location_off_outlined,
-        message: 'Belum ada lokasi pada blok ini.',
+        message: 'Belum ada lokasi pada stock opname ini.',
       );
     }
 
@@ -282,15 +251,8 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        const _StepHeader(
-          step: 2,
-          title: 'Pilih Lokasi',
-          description: 'Pilih lokasi untuk melihat label yang harus discan.',
-        ),
-        const SizedBox(height: 14),
         for (final location in viewModel.locations)
           _LocationMenuCard(
-            block: viewModel.selectedBlock!,
             location: location,
             onTap: () => viewModel.selectLocation(location),
           ),
@@ -306,42 +268,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
-          const _StepHeader(
-            step: 3,
-            title: 'Scan Label',
-            description: 'Periksa daftar label, lalu tekan tombol Scan Label.',
-          ),
-          const SizedBox(height: 14),
           if (viewModel.isComplete) ...[
             const _CompletedBanner(),
             const SizedBox(height: 12),
           ],
           _LabelSummary(viewModel: viewModel),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _searchController,
-            onChanged: (value) => _onSearchChanged(value, viewModel),
-            decoration: InputDecoration(
-              hintText: 'Cari nomor label...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: () {
-                        _searchController.clear();
-                        viewModel.setSearch('');
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.close),
-                    ),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
           const SizedBox(height: 12),
           if (viewModel.isLoadingLabels)
             const Padding(
@@ -380,168 +311,9 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 }
 
-class _StepHeader extends StatelessWidget {
-  const _StepHeader({
-    required this.step,
-    required this.title,
-    required this.description,
-  });
-
-  final int step;
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: Color(0xFF0D47A1),
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            '$step',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                description,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BlockMenuCard extends StatelessWidget {
-  const _BlockMenuCard({required this.block, required this.onTap});
-
-  final SoV2Blok block;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final unknown = block.blok == soV2UnknownBlok;
-    final progress = block.progress.clamp(0.0, 1.0);
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 1,
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: unknown
-                          ? Colors.orange.shade50
-                          : Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      unknown ? Icons.location_off : Icons.grid_view_rounded,
-                      color: unknown
-                          ? Colors.orange.shade700
-                          : const Color(0xFF0D47A1),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          unknown ? 'Tanpa Blok' : 'Blok ${block.blok}',
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${block.locationCount} lokasi',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${block.scannedCount}/${block.labelCount} label',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    '${(progress * 100).round()}%',
-                    style: const TextStyle(
-                      color: Color(0xFF0D47A1),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                borderRadius: BorderRadius.circular(8),
-                backgroundColor: Colors.grey.shade200,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _LocationMenuCard extends StatelessWidget {
-  const _LocationMenuCard({
-    required this.block,
-    required this.location,
-    required this.onTap,
-  });
+  const _LocationMenuCard({required this.location, required this.onTap});
 
-  final SoV2Blok block;
   final SoV2Lokasi location;
   final VoidCallback onTap;
 
@@ -552,7 +324,7 @@ class _LocationMenuCard extends StatelessWidget {
         location.labelCount > 0 && location.scannedCount >= location.labelCount;
     final locationName = location.isUnknown
         ? 'Lokasi Tidak Diketahui'
-        : '${block.blok}${location.locationId}';
+        : '${location.blok}${location.locationId}';
 
     return Card(
       color: Colors.white,
@@ -563,97 +335,64 @@ class _LocationMenuCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(11),
-                    decoration: BoxDecoration(
-                      color: location.isUnknown
-                          ? Colors.orange.shade50
-                          : Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      location.isUnknown
-                          ? Icons.location_off
-                          : Icons.location_on_outlined,
-                      color: location.isUnknown
-                          ? Colors.orange.shade700
+              SizedBox(
+                width: 38,
+                height: 38,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 4,
+                      backgroundColor: Colors.grey.shade200,
+                      color: complete
+                          ? Colors.green.shade600
                           : const Color(0xFF0D47A1),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                locationName,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            if (complete) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.check_circle,
-                                size: 18,
-                                color: Colors.green.shade700,
-                              ),
-                            ],
-                          ],
-                        ),
-                        if (location.description.isNotEmpty)
-                          Text(
-                            location.description,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                    complete
+                        ? Icon(
+                            Icons.check,
+                            size: 16,
+                            color: Colors.green.shade700,
+                          )
+                        : Text(
+                            '${(progress * 100).round()}',
+                            style: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0D47A1),
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${location.scannedCount}/${location.labelCount} label',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  locationName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  Text(
-                    '${(progress * 100).round()}%',
-                    style: TextStyle(
-                      color: complete
-                          ? Colors.green.shade700
-                          : const Color(0xFF0D47A1),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                borderRadius: BorderRadius.circular(8),
-                backgroundColor: Colors.grey.shade200,
-                color: complete ? Colors.green.shade600 : null,
+              const SizedBox(width: 8),
+              Text(
+                '${location.scannedCount}/${location.labelCount}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: complete
+                      ? Colors.green.shade700
+                      : Colors.grey.shade700,
+                ),
               ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),
@@ -748,53 +487,131 @@ class _LabelGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 10),
+    final complete =
+        group.labelCount > 0 && group.scannedCount >= group.labelCount;
+    final accentColor = complete
+        ? Colors.green.shade600
+        : const Color(0xFF0D47A1);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        initiallyExpanded: true,
-        title: Text(
-          group.typeName.isEmpty ? 'Jenis tidak diketahui' : group.typeName,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          splashColor: Colors.transparent,
         ),
-        subtitle: Text(
-          '${group.scannedCount}/${group.labelCount} label · '
-          '${soV2FormatQuantity(group.totalQuantity)} $unit',
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          tilePadding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+          childrenPadding: EdgeInsets.zero,
+          iconColor: accentColor,
+          collapsedIconColor: Colors.grey.shade500,
+          title: Text(
+            group.typeName.isEmpty ? 'Jenis tidak diketahui' : group.typeName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                Text(
+                  '${group.scannedCount}/${group.labelCount} label',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '· ${soV2FormatQuantity(group.totalQuantity)} $unit',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+          children: [
+            Container(height: 1, color: Colors.grey.shade100),
+            for (final label in group.labels)
+              _LabelRow(label: label, unit: unit),
+          ],
         ),
-        children: group.labels
-            .map(
-              (label) => Container(
-                color: label.isScanned ? Colors.green.shade50 : Colors.white,
-                child: ListTile(
-                  dense: true,
-                  leading: Icon(
-                    label.isScanned
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    color: label.isScanned
-                        ? Colors.green.shade700
-                        : Colors.grey,
-                    size: 20,
-                  ),
-                  title: Text(
-                    label.primaryValue,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: label.isScanned
-                          ? Colors.green.shade800
-                          : Colors.black87,
-                    ),
-                  ),
-                  trailing: label.quantityDisplay(unit) == null
-                      ? null
-                      : Text(label.quantityDisplay(unit)!),
+      ),
+    );
+  }
+}
+
+class _LabelRow extends StatelessWidget {
+  const _LabelRow({required this.label, required this.unit});
+
+  final SoV2LabelRow label;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final quantity = label.quantityDisplay(unit);
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      child: Row(
+        children: [
+          Icon(
+            label.isScanned
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked,
+            size: 18,
+            color: label.isScanned
+                ? Colors.green.shade600
+                : Colors.grey.shade400,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label.primaryValue,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13.5,
+                color: label.isScanned
+                    ? const Color(0xFF1F2937)
+                    : Colors.grey.shade600,
+              ),
+            ),
+          ),
+          if (quantity != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: label.isScanned
+                    ? Colors.green.shade50
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                quantity,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: label.isScanned
+                      ? Colors.green.shade700
+                      : Colors.grey.shade600,
                 ),
               ),
-            )
-            .toList(),
+            ),
+          ],
+        ],
       ),
     );
   }

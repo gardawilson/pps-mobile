@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/components/app_drawer.dart';
 import '../../../shared/lokasi/lokasi_repository.dart';
 import '../../../shared/lokasi/lokasi_view_model.dart';
 import '../repository/label_repository.dart';
@@ -28,6 +29,7 @@ class LabelScreen extends StatelessWidget {
         ),
       ],
       child: Scaffold(
+        drawer: const AppDrawer(currentRoute: '/mapping'),
         appBar: AppBar(
           title: const Text('Mapping', style: TextStyle(color: Colors.white)),
           backgroundColor: const Color(0xFF0D47A1),

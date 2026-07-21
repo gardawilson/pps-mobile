@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pps_mobile/shared/components/app_drawer.dart';
 
 import '../model/so_v2_models.dart';
 import '../view_model/so_v2_category_view_model.dart';
@@ -28,12 +29,7 @@ class _SoV2CategoryScreenState extends State<SoV2CategoryScreen> {
   }
 
   Future<void> _openCategory(SoV2Kategori category) async {
-    if (category.status == SoV2Status.notStarted) {
-      _showMessage(
-        'Belum ada stock opname aktif untuk kategori ${category.categoryName}.',
-      );
-      return;
-    }
+    if (category.status != SoV2Status.inProgress) return;
 
     final stockOpnameNo = category.stockOpnameNo;
     if (stockOpnameNo == null || stockOpnameNo.isEmpty) {
@@ -43,18 +39,21 @@ class _SoV2CategoryScreenState extends State<SoV2CategoryScreen> {
     await _openDetail(
       stockOpnameNo: stockOpnameNo,
       categoryCode: category.categoryCode,
+      categoryName: category.categoryName,
     );
   }
 
   Future<void> _openDetail({
     required String stockOpnameNo,
     required String categoryCode,
+    required String categoryName,
   }) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SoV2DetailScreen(
           stockOpnameNo: stockOpnameNo,
           categoryCode: categoryCode,
+          categoryName: categoryName,
         ),
       ),
     );
@@ -79,6 +78,7 @@ class _SoV2CategoryScreenState extends State<SoV2CategoryScreen> {
       child: Consumer<SoV2CategoryViewModel>(
         builder: (context, viewModel, _) => Scaffold(
           backgroundColor: const Color(0xFFF5F7FA),
+          drawer: const AppDrawer(currentRoute: '/stockopname-v2'),
           appBar: AppBar(
             backgroundColor: const Color(0xFF0D47A1),
             foregroundColor: Colors.white,
@@ -147,10 +147,7 @@ class _SoV2CategoryScreenState extends State<SoV2CategoryScreen> {
 }
 
 class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({
-    required this.category,
-    required this.onTap,
-  });
+  const _CategoryCard({required this.category, required this.onTap});
 
   final SoV2Kategori category;
   final VoidCallback onTap;
@@ -158,83 +155,87 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = category.progress.clamp(0.0, 1.0);
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 2,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: category.status.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+    final clickable = category.status == SoV2Status.inProgress;
+    return Opacity(
+      opacity: clickable ? 1 : 0.6,
+      child: Card(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: clickable ? onTap : null,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: category.status.color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.inventory_2_outlined,
+                        color: category.status.color,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.inventory_2_outlined,
-                      color: category.status.color,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category.categoryName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            category.categoryName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        Text(
-                          category.stockOpnameNo ?? category.categoryCode,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
+                          Text(
+                            category.stockOpnameNo ?? category.categoryCode,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    category.status.label,
-                    style: TextStyle(
-                      color: category.status.color,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    '${category.scannedCount}/${category.labelCount} label',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 7,
-                  backgroundColor: Colors.grey.shade200,
-                  color: category.status.color,
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      category.status.label,
+                      style: TextStyle(
+                        color: category.status.color,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '${category.scannedCount}/${category.labelCount} label',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 7,
+                    backgroundColor: Colors.grey.shade200,
+                    color: category.status.color,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/api_update_constant.dart';
+import '../../../core/network/network_mode_config.dart';
 import '../model/update_model.dart';
 
 class UpdateViewModel {
@@ -56,6 +57,11 @@ class UpdateViewModel {
   // =============================
   Future<UpdateInfo?> checkForUpdate() async {
     try {
+      print('🌐 [UPDATE][$_appId] networkMode=${NetworkModeConfig.currentMode.name} '
+          '(auto-resolved=${NetworkModeConfig.autoResolvedMode.name})');
+      print('🌐 [UPDATE][$_appId] updateBaseUrl="${UpdateConstants.updateBaseUrl}"');
+      print('🌐 [UPDATE][$_appId] versionUrl="${UpdateConstants.versionUrl}"');
+
       final resp = await _dio.get(
         UpdateConstants.versionUrl,
         options: Options(responseType: ResponseType.json),

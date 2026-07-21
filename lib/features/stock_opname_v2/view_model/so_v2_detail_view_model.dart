@@ -15,14 +15,11 @@ class SoV2DetailViewModel extends ChangeNotifier {
   String categoryCode;
   final SoV2Repository repository;
 
-  List<SoV2Blok> blocks = [];
   List<SoV2Lokasi> locations = [];
   List<SoV2LabelGroup> groups = [];
 
-  SoV2Blok? selectedBlock;
   SoV2Lokasi? selectedLocation;
 
-  bool isLoadingBlocks = false;
   bool isLoadingLocations = false;
   bool isLoadingLabels = false;
   bool isLoadingMore = false;
@@ -43,42 +40,23 @@ class SoV2DetailViewModel extends ChangeNotifier {
   bool get canLoadMore =>
       currentPage < totalPages || loadedLabelCount < totalRecords;
 
-  Future<void> loadBlocks() async {
-    isLoadingBlocks = true;
-    error = null;
-    notifyListeners();
-    try {
-      blocks = await repository.fetchBlok(stockOpnameNo);
-      blocks.sort((a, b) {
-        if (a.blok == soV2UnknownBlok) return 1;
-        if (b.blok == soV2UnknownBlok) return -1;
-        return a.blok.compareTo(b.blok);
-      });
-    } catch (e) {
-      error = _message(e);
-    } finally {
-      isLoadingBlocks = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> selectBlock(SoV2Blok block) async {
-    selectedBlock = block;
+  Future<void> loadLocations() async {
     selectedLocation = null;
-    locations = [];
     groups = [];
     _resetLabelSummary();
     isLoadingLocations = true;
     error = null;
     notifyListeners();
     try {
-      final page = await repository.fetchLokasi(stockOpnameNo, block.blok);
+      final page = await repository.fetchLokasi(stockOpnameNo);
       locations = page.items;
       isComplete = page.isComplete;
       if (categoryCode.isEmpty) categoryCode = page.categoryCode;
       locations.sort((a, b) {
-        if (a.isUnknown) return 1;
-        if (b.isUnknown) return -1;
+        if (a.blok == soV2UnknownBlok) return 1;
+        if (b.blok == soV2UnknownBlok) return -1;
+        final blokCompare = a.blok.compareTo(b.blok);
+        if (blokCompare != 0) return blokCompare;
         return a.locationId.compareTo(b.locationId);
       });
     } catch (e) {
@@ -101,9 +79,8 @@ class SoV2DetailViewModel extends ChangeNotifier {
   }
 
   Future<void> loadLabels({required bool reset}) async {
-    final block = selectedBlock;
     final location = selectedLocation;
-    if (block == null || location == null) return;
+    if (location == null) return;
 
     final requestedPage = reset ? 1 : currentPage + 1;
     if (reset) {
@@ -120,7 +97,7 @@ class SoV2DetailViewModel extends ChangeNotifier {
     try {
       final page = await repository.fetchLabels(
         stockOpnameNo: stockOpnameNo,
-        blok: block.blok,
+        blok: location.blok,
         locationId: location.locationId,
         page: requestedPage,
         search: search,
@@ -180,17 +157,6 @@ class SoV2DetailViewModel extends ChangeNotifier {
 
   void backToLocations() {
     selectedLocation = null;
-    groups = [];
-    search = '';
-    _resetLabelSummary();
-    error = null;
-    notifyListeners();
-  }
-
-  void backToBlocks() {
-    selectedBlock = null;
-    selectedLocation = null;
-    locations = [];
     groups = [];
     search = '';
     _resetLabelSummary();
