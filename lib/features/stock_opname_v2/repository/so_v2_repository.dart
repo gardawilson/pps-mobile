@@ -8,35 +8,15 @@ class SoV2Repository {
 
   final ApiClient _apiClient;
 
-  Future<List<SoV2Kategori>> fetchKategori() async {
+  Future<List<SoV2MyLokasi>> fetchMyLokasi() async {
     try {
       final response = await _apiClient.getJson(
-        '/api/stock-opname-v2/kategori',
+        '/api/stock-opname-v2/my-lokasi',
         useAuth: true,
       );
-      return _mapList(response['data']).map(SoV2Kategori.fromJson).toList();
+      return _mapList(response['data']).map(SoV2MyLokasi.fromJson).toList();
     } on ApiFailure catch (error) {
       if (error.statusCode == 404) return [];
-      rethrow;
-    }
-  }
-
-  Future<SoV2LokasiPage> fetchLokasi(String stockOpnameNo) async {
-    try {
-      final response = await _apiClient.getJson(
-        '/api/stock-opname-v2/transaksi/${Uri.encodeComponent(stockOpnameNo)}/lokasi',
-        useAuth: true,
-      );
-      return SoV2LokasiPage.fromJson(_map(response['data']));
-    } on ApiFailure catch (error) {
-      if (error.statusCode == 404) {
-        return const SoV2LokasiPage(
-          categoryCode: '',
-          categoryName: '',
-          isComplete: false,
-          items: [],
-        );
-      }
       rethrow;
     }
   }

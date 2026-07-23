@@ -3,21 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../constants/kategori_constants.dart';
 import '../model/so_v2_models.dart';
 import '../view_model/so_v2_detail_view_model.dart';
+import 'so_v2_category_style.dart';
 import 'so_v2_scan_screen.dart';
 
 class SoV2DetailScreen extends StatefulWidget {
-  const SoV2DetailScreen({
-    super.key,
-    required this.stockOpnameNo,
-    required this.categoryCode,
-    required this.categoryName,
-  });
+  const SoV2DetailScreen({super.key, required this.myLokasi});
 
-  final String stockOpnameNo;
-  final String categoryCode;
-  final String categoryName;
+  final SoV2MyLokasi myLokasi;
 
   @override
   State<SoV2DetailScreen> createState() => _SoV2DetailScreenState();
@@ -34,9 +29,10 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   void initState() {
     super.initState();
     _viewModel = SoV2DetailViewModel(
-      stockOpnameNo: widget.stockOpnameNo,
-      categoryCode: widget.categoryCode,
-    )..loadLocations();
+      stockOpnameNo: widget.myLokasi.stockOpnameNo,
+      categoryCode: widget.myLokasi.categoryCode,
+      location: widget.myLokasi.location,
+    )..init();
     _labelScrollController.addListener(_onLabelScroll);
   }
 
@@ -53,7 +49,6 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
 
   void _onLabelScroll() {
     if (!_labelScrollController.hasClients ||
-        _viewModel.selectedLocation == null ||
         !_viewModel.canLoadMore ||
         _viewModel.isLoadingLabels ||
         _viewModel.isLoadingMore) {
@@ -65,8 +60,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 
   void _loadMoreIfNeeded(double extentAfter) {
-    if (_viewModel.selectedLocation == null ||
-        !_viewModel.canLoadMore ||
+    if (!_viewModel.canLoadMore ||
         _viewModel.isLoadingLabels ||
         _viewModel.isLoadingMore) {
       return;
@@ -90,11 +84,6 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       _closeSearch(viewModel);
       return;
     }
-    if (viewModel.selectedLocation != null) {
-      _searchController.clear();
-      viewModel.backToLocations();
-      return;
-    }
     Navigator.of(context).pop();
   }
 
@@ -110,13 +99,12 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 
   Future<void> _openScanner(SoV2DetailViewModel viewModel) async {
-    final location = viewModel.selectedLocation;
-    if (location == null) return;
+    final location = viewModel.location;
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => SoV2ScanScreen(
-          stockOpnameNo: widget.stockOpnameNo,
+          stockOpnameNo: widget.myLokasi.stockOpnameNo,
           blok: location.blok,
           locationId: location.locationId,
         ),
@@ -135,19 +123,18 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 
   Future<void> _refreshCurrentStep(SoV2DetailViewModel viewModel) {
-    if (viewModel.selectedLocation != null) {
-      return viewModel.loadLabels(reset: true);
-    }
-    return viewModel.loadLocations();
+    return viewModel.loadLabels(reset: true);
   }
 
   String _appBarTitle(SoV2DetailViewModel viewModel) {
-    final location = viewModel.selectedLocation;
-    if (location == null) return widget.categoryName;
+    final categoryName = KategoriConstants.getLabel(
+      widget.myLokasi.categoryCode,
+    );
+    final location = widget.myLokasi.location;
     final locationText = location.isUnknown
         ? 'Lokasi Tidak Diketahui'
         : '${location.blok}${location.locationId}';
-    return '${widget.categoryName} ($locationText)';
+    return '$categoryName ($locationText)';
   }
 
   @override
@@ -156,16 +143,15 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       value: _viewModel,
       child: Consumer<SoV2DetailViewModel>(
         builder: (context, viewModel, _) {
-          final isLabelStep = viewModel.selectedLocation != null;
           return PopScope(
-            canPop: viewModel.selectedLocation == null,
+            canPop: !_isSearching,
             onPopInvokedWithResult: (didPop, _) {
               if (!didPop) _handleBack(viewModel);
             },
             child: Scaffold(
               backgroundColor: const Color(0xFFF5F7FA),
               appBar: AppBar(
-                backgroundColor: const Color(0xFF0D47A1),
+                backgroundColor: soV2ThemeBlue,
                 foregroundColor: Colors.white,
                 leading: IconButton(
                   onPressed: () => _handleBack(viewModel),
@@ -193,24 +179,22 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                actions: isLabelStep
-                    ? [
-                        IconButton(
-                          onPressed: _isSearching
-                              ? () => _closeSearch(viewModel)
-                              : _openSearch,
-                          icon: Icon(_isSearching ? Icons.close : Icons.search),
-                        ),
-                      ]
-                    : null,
+                actions: [
+                  IconButton(
+                    onPressed: _isSearching
+                        ? () => _closeSearch(viewModel)
+                        : _openSearch,
+                    icon: Icon(_isSearching ? Icons.close : Icons.search),
+                  ),
+                ],
               ),
               body: RefreshIndicator(
                 onRefresh: () => _refreshCurrentStep(viewModel),
-                child: _buildCurrentStep(viewModel),
+                child: _buildLabelStep(viewModel),
               ),
-              floatingActionButton: isLabelStep && !viewModel.isComplete
+              floatingActionButton: !viewModel.isComplete
                   ? FloatingActionButton(
-                      backgroundColor: const Color(0xFF0D47A1),
+                      backgroundColor: soV2ThemeBlue,
                       foregroundColor: Colors.white,
                       onPressed: () => _openScanner(viewModel),
                       child: const Icon(Icons.qr_code_scanner),
@@ -223,43 +207,6 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     );
   }
 
-  Widget _buildCurrentStep(SoV2DetailViewModel viewModel) {
-    if (viewModel.selectedLocation != null) {
-      return _buildLabelStep(viewModel);
-    }
-    return _buildLocationStep(viewModel);
-  }
-
-  Widget _buildLocationStep(SoV2DetailViewModel viewModel) {
-    if (viewModel.isLoadingLocations && viewModel.locations.isEmpty) {
-      return const _LoadingList(message: 'Memuat daftar lokasi...');
-    }
-    if (viewModel.error != null && viewModel.locations.isEmpty) {
-      return _ErrorList(
-        message: viewModel.error!,
-        onRetry: viewModel.loadLocations,
-      );
-    }
-    if (viewModel.locations.isEmpty) {
-      return const _EmptyList(
-        icon: Icons.location_off_outlined,
-        message: 'Belum ada lokasi pada stock opname ini.',
-      );
-    }
-
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      children: [
-        for (final location in viewModel.locations)
-          _LocationMenuCard(
-            location: location,
-            onTap: () => viewModel.selectLocation(location),
-          ),
-      ],
-    );
-  }
-
   Widget _buildLabelStep(SoV2DetailViewModel viewModel) {
     return NotificationListener<ScrollNotification>(
       onNotification: _onLabelScrollNotification,
@@ -268,12 +215,8 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
-          if (viewModel.isComplete) ...[
-            const _CompletedBanner(),
-            const SizedBox(height: 12),
-          ],
-          _LabelSummary(viewModel: viewModel),
-          const SizedBox(height: 12),
+          _LokasiHeaderCard(myLokasi: widget.myLokasi, viewModel: viewModel),
+          const SizedBox(height: 16),
           if (viewModel.isLoadingLabels)
             const Padding(
               padding: EdgeInsets.all(32),
@@ -311,164 +254,210 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 }
 
-class _LocationMenuCard extends StatelessWidget {
-  const _LocationMenuCard({required this.location, required this.onTap});
+class _LokasiHeaderCard extends StatelessWidget {
+  const _LokasiHeaderCard({required this.myLokasi, required this.viewModel});
 
-  final SoV2Lokasi location;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = location.progress.clamp(0.0, 1.0);
-    final complete =
-        location.labelCount > 0 && location.scannedCount >= location.labelCount;
-    final locationName = location.isUnknown
-        ? 'Lokasi Tidak Diketahui'
-        : '${location.blok}${location.locationId}';
-
-    return Card(
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 1,
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 38,
-                height: 38,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      value: progress,
-                      strokeWidth: 4,
-                      backgroundColor: Colors.grey.shade200,
-                      color: complete
-                          ? Colors.green.shade600
-                          : const Color(0xFF0D47A1),
-                    ),
-                    complete
-                        ? Icon(
-                            Icons.check,
-                            size: 16,
-                            color: Colors.green.shade700,
-                          )
-                        : Text(
-                            '${(progress * 100).round()}',
-                            style: const TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0D47A1),
-                            ),
-                          ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  locationName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${location.scannedCount}/${location.labelCount}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: complete
-                      ? Colors.green.shade700
-                      : Colors.grey.shade700,
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LabelSummary extends StatelessWidget {
-  const _LabelSummary({required this.viewModel});
-
+  final SoV2MyLokasi myLokasi;
   final SoV2DetailViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _SummaryCard(
-            label: 'Progress',
-            value: '${viewModel.totalScanned}/${viewModel.totalRecords}',
-            icon: Icons.fact_check_outlined,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _SummaryCard(
-            label: viewModel.unit == 'pcs' ? 'Total Pcs' : 'Total Berat',
-            value:
-                '${soV2FormatQuantity(viewModel.totalQuantity)} ${viewModel.unit}',
-            icon: viewModel.unit == 'pcs'
-                ? Icons.numbers
-                : Icons.monitor_weight_outlined,
-          ),
-        ),
-      ],
-    );
-  }
-}
+    final location = viewModel.location;
+    final progress = viewModel.totalRecords == 0
+        ? 0.0
+        : (viewModel.totalScanned / viewModel.totalRecords).clamp(0.0, 1.0);
+    final complete = viewModel.isComplete;
+    final icon = soV2IconForCategory(myLokasi.categoryCode);
+    final categoryName = KategoriConstants.getLabel(myLokasi.categoryCode);
+    final locationName = location.isUnknown
+        ? 'Lokasi Tidak Diketahui'
+        : '${location.blok}${location.locationId}';
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: soV2ThemeBlue.withValues(alpha: 0.1),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF0D47A1)),
-          const SizedBox(width: 10),
-          Expanded(
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [soV2ThemeBlue, soV2ThemeBlueLight],
+              ),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  right: -12,
+                  top: -18,
+                  child: Icon(
+                    icon,
+                    size: 92,
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        locationName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(icon, size: 12, color: Colors.white),
+                              const SizedBox(width: 4),
+                              Text(
+                                categoryName,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (complete) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 13,
+                                  color: soV2CompleteGreen,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Selesai',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: soV2CompleteGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${viewModel.totalScanned}/${viewModel.totalRecords} label discan',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: soV2ThemeBlue,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey.shade200,
+                    color: complete ? soV2CompleteGreen : soV2ThemeBlue,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Icon(
+                      viewModel.unit == 'pcs'
+                          ? Icons.numbers
+                          : Icons.scale_outlined,
+                      size: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${soV2FormatQuantity(viewModel.totalQuantity)} ${viewModel.unit} total',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      myLokasi.stockOpnameNo,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade400,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -489,16 +478,20 @@ class _LabelGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final complete =
         group.labelCount > 0 && group.scannedCount >= group.labelCount;
-    final accentColor = complete
-        ? Colors.green.shade600
-        : const Color(0xFF0D47A1);
+    final accentColor = complete ? soV2CompleteGreen : soV2ThemeBlue;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: soV2ThemeBlue.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Theme(
@@ -613,96 +606,6 @@ class _LabelRow extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _CompletedBanner extends StatelessWidget {
-  const _CompletedBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle, color: Colors.green.shade700),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'Transaksi stock opname sudah selesai.',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LoadingList extends StatelessWidget {
-  const _LoadingList({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        const SizedBox(height: 160),
-        const Center(child: CircularProgressIndicator()),
-        const SizedBox(height: 16),
-        Center(child: Text(message)),
-      ],
-    );
-  }
-}
-
-class _ErrorList extends StatelessWidget {
-  const _ErrorList({required this.message, required this.onRetry});
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(32),
-      children: [
-        const SizedBox(height: 100),
-        const Icon(Icons.error_outline, size: 56, color: Colors.red),
-        const SizedBox(height: 16),
-        Text(message, textAlign: TextAlign.center),
-        const SizedBox(height: 16),
-        FilledButton(onPressed: onRetry, child: const Text('Coba Lagi')),
-      ],
-    );
-  }
-}
-
-class _EmptyList extends StatelessWidget {
-  const _EmptyList({required this.icon, required this.message});
-
-  final IconData icon;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        const SizedBox(height: 140),
-        Icon(icon, size: 56, color: Colors.grey),
-        const SizedBox(height: 12),
-        Text(message, textAlign: TextAlign.center),
-      ],
     );
   }
 }

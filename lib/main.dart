@@ -18,7 +18,7 @@ import 'features/stock_opname/view/stock_opname_list_screen.dart';
 import 'features/stock_opname/view_model/stock_opname_detail_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_list_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_scan_view_model.dart';
-import 'features/stock_opname_v2/view/so_v2_category_screen.dart';
+import 'features/stock_opname_v2/view/so_v2_my_lokasi_screen.dart';
 import 'features/mapping_v2/view/mapping_v2_screen.dart';
 
 const String appEnvironment = String.fromEnvironment(
@@ -71,7 +71,7 @@ class MyApp extends StatelessWidget {
           '/': (context) => const LoginScreen(),
           '/home': (context) => HomeScreen(),
           '/stockopname': (context) => StockOpnameListScreen(),
-          '/stockopname-v2': (context) => const SoV2CategoryScreen(),
+          '/stockopname-v2': (context) => const SoV2MyLokasiScreen(),
           '/mapping': (context) => LabelScreen(),
           '/mapping-v2': (context) => const MappingV2Screen(),
           '/bj-jual': (context) => const BjJualListScreen(),

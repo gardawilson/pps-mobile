@@ -1,77 +1,3 @@
-import 'package:flutter/material.dart';
-
-enum SoV2Status {
-  notStarted,
-  inProgress,
-  completed;
-
-  factory SoV2Status.fromApi(String value) {
-    return switch (value.toLowerCase()) {
-      'in_progress' => SoV2Status.inProgress,
-      'completed' => SoV2Status.completed,
-      _ => SoV2Status.notStarted,
-    };
-  }
-
-  String get label => switch (this) {
-    SoV2Status.notStarted => 'Belum Mulai',
-    SoV2Status.inProgress => 'Sedang Berjalan',
-    SoV2Status.completed => 'Selesai',
-  };
-
-  Color get color => switch (this) {
-    SoV2Status.notStarted => const Color(0xFF6B7280),
-    SoV2Status.inProgress => const Color(0xFF1565C0),
-    SoV2Status.completed => const Color(0xFF16835D),
-  };
-}
-
-class SoV2Kategori {
-  const SoV2Kategori({
-    required this.categoryId,
-    required this.categoryCode,
-    required this.categoryName,
-    required this.stockOpnameNo,
-    required this.status,
-    required this.labelCount,
-    required this.scannedCount,
-    this.startDate,
-    this.completedAt,
-  });
-
-  final int categoryId;
-  final String categoryCode;
-  final String categoryName;
-  final String? stockOpnameNo;
-  final SoV2Status status;
-  final int labelCount;
-  final int scannedCount;
-  final DateTime? startDate;
-  final DateTime? completedAt;
-
-  double get progress => labelCount == 0 ? 0 : scannedCount / labelCount;
-
-  factory SoV2Kategori.fromJson(Map<String, dynamic> json) {
-    return SoV2Kategori(
-      categoryId: _asInt(json['categoryId'] ?? json['CategoryId']),
-      categoryCode: _asString(
-        json['categoryCode'] ?? json['CategoryCode'] ?? json['kode'],
-      ),
-      categoryName: _asString(
-        json['categoryName'] ?? json['CategoryName'] ?? json['nama'],
-      ),
-      stockOpnameNo: _asNullableString(
-        json['stockOpnameNo'] ?? json['StockOpnameNo'] ?? json['NoSO'],
-      ),
-      status: SoV2Status.fromApi(_asString(json['status'])),
-      labelCount: _asInt(json['labelCount']),
-      scannedCount: _asInt(json['scannedCount']),
-      startDate: DateTime.tryParse(_asString(json['startDate'])),
-      completedAt: DateTime.tryParse(_asString(json['completedAt'])),
-    );
-  }
-}
-
 const String soV2UnknownBlok = 'TIDAK_DIKETAHUI';
 const int soV2UnknownLocationId = 0;
 
@@ -109,25 +35,22 @@ class SoV2Lokasi {
   }
 }
 
-class SoV2LokasiPage {
-  const SoV2LokasiPage({
+class SoV2MyLokasi {
+  const SoV2MyLokasi({
+    required this.stockOpnameNo,
     required this.categoryCode,
-    required this.categoryName,
-    required this.isComplete,
-    required this.items,
+    required this.location,
   });
 
+  final String stockOpnameNo;
   final String categoryCode;
-  final String categoryName;
-  final bool isComplete;
-  final List<SoV2Lokasi> items;
+  final SoV2Lokasi location;
 
-  factory SoV2LokasiPage.fromJson(Map<String, dynamic> json) {
-    return SoV2LokasiPage(
+  factory SoV2MyLokasi.fromJson(Map<String, dynamic> json) {
+    return SoV2MyLokasi(
+      stockOpnameNo: _asString(json['stockOpnameNo']),
       categoryCode: _asString(json['categoryCode']),
-      categoryName: _asString(json['categoryName']),
-      isComplete: _asBool(json['isComplete']),
-      items: _asMapList(json['data']).map(SoV2Lokasi.fromJson).toList(),
+      location: SoV2Lokasi.fromJson(json),
     );
   }
 }
@@ -266,11 +189,6 @@ bool _asBool(dynamic value) =>
     value == true || value == 1 || '$value'.toLowerCase() == 'true';
 
 String _asString(dynamic value) => value?.toString() ?? '';
-
-String? _asNullableString(dynamic value) {
-  final result = _asString(value).trim();
-  return result.isEmpty || result.toLowerCase() == 'null' ? null : result;
-}
 
 List<Map<String, dynamic>> _asMapList(dynamic value) {
   if (value is! List) return const [];

@@ -8,6 +8,7 @@ import 'package:vibration/vibration.dart';
 
 import '../../../core/network/api_errors.dart';
 import '../repository/so_v2_repository.dart';
+import 'so_v2_category_style.dart';
 
 class SoV2ScanScreen extends StatefulWidget {
   const SoV2ScanScreen({
@@ -163,17 +164,8 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black87,
         foregroundColor: Colors.white,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Scan Stock Opname V2'),
-            Text(
-              widget.locationId == 0
-                  ? 'Lokasi tidak diketahui'
-                  : '${widget.blok}${widget.locationId}',
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
+        title: Text(
+          'Scan ${widget.locationId == 0 ? 'Lokasi tidak diketahui' : '${widget.blok}${widget.locationId}'}',
         ),
         actions: [
           IconButton(
@@ -234,10 +226,11 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: soV2ThemeBlue,
+        foregroundColor: Colors.white,
         onPressed: _isProcessing ? null : _showManualInput,
-        icon: const Icon(Icons.keyboard),
-        label: const Text('Input Manual'),
+        child: const Icon(Icons.keyboard),
       ),
     );
   }
