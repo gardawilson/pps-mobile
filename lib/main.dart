@@ -8,7 +8,7 @@ import 'package:pps_mobile/shared/lokasi/lokasi_view_model.dart';
 import 'package:provider/provider.dart';
 
 import 'core/network/network_mode_config.dart';
-import 'features/home/view/home_screen.dart';
+import 'features/home/view/main_shell.dart';
 import 'features/login/view/login_screen.dart';
 import 'features/profile/view_model/user_profile_view_model.dart';
 import 'features/bj_jual/view/bj_jual_list_screen.dart';
@@ -69,7 +69,7 @@ class MyApp extends StatelessWidget {
         initialRoute: '/',
         routes: {
           '/': (context) => const LoginScreen(),
-          '/home': (context) => HomeScreen(),
+          '/home': (context) => const MainShell(),
           '/stockopname': (context) => StockOpnameListScreen(),
           '/stockopname-v2': (context) => const SoV2MyLokasiScreen(),
           '/mapping': (context) => LabelScreen(),

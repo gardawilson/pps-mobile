@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:pps_mobile/shared/components/app_drawer.dart';
 
-import '../../../constants/kategori_constants.dart';
 import '../model/so_v2_models.dart';
 import '../view_model/so_v2_my_lokasi_view_model.dart';
 import 'so_v2_category_style.dart';
@@ -30,6 +28,94 @@ class _SoV2MyLokasiScreenState extends State<SoV2MyLokasiScreen> {
     super.dispose();
   }
 
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        8,
+        MediaQuery.of(context).padding.top + 6,
+        20,
+        20,
+      ),
+      decoration: const BoxDecoration(
+        color: soV2ThemeBlue,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'STOCK OPNAME',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white.withValues(alpha: 0.7),
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Lokasi Anda',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.qr_code_scanner_rounded, size: 17, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Pilih salah satu lokasi di bawah untuk mulai scan label.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w500,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openDetail(SoV2MyLokasi myLokasi) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -48,18 +134,16 @@ class _SoV2MyLokasiScreenState extends State<SoV2MyLokasiScreen> {
       child: Consumer<SoV2MyLokasiViewModel>(
         builder: (context, viewModel, _) => Scaffold(
           backgroundColor: const Color(0xFFF5F7FA),
-          drawer: const AppDrawer(currentRoute: '/stockopname-v2'),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF0D47A1),
-            foregroundColor: Colors.white,
-            title: const Text(
-              'Stock Opname V2',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-          ),
-          body: RefreshIndicator(
-            onRefresh: viewModel.load,
-            child: _buildBody(viewModel),
+          body: Column(
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: viewModel.load,
+                  child: _buildBody(viewModel),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -98,29 +182,15 @@ class _SoV2MyLokasiScreenState extends State<SoV2MyLokasiScreen> {
     }
 
     return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
-        const Text(
-          'Lokasi Anda',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Pilih salah satu lokasi di bawah untuk mulai scan label.',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 18),
         for (final myLokasi in viewModel.items) ...[
           _MyLokasiCard(
             myLokasi: myLokasi,
             onTap: () => _openDetail(myLokasi),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
         ],
       ],
     );
@@ -139,8 +209,6 @@ class _MyLokasiCard extends StatelessWidget {
     final progress = location.progress.clamp(0.0, 1.0);
     final complete =
         location.labelCount > 0 && location.scannedCount >= location.labelCount;
-    final icon = soV2IconForCategory(myLokasi.categoryCode);
-    final categoryName = KategoriConstants.getLabel(myLokasi.categoryCode);
     final locationName = location.isUnknown
         ? 'Lokasi Tidak Diketahui'
         : '${location.blok}${location.locationId}';
@@ -148,15 +216,18 @@ class _MyLokasiCard extends StatelessWidget {
         ? 'pcs'
         : 'kg';
 
+    final progressColor = complete ? soV2CompleteGreen : soV2ThemeBlue;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE7EAF0)),
         boxShadow: [
           BoxShadow(
-            color: soV2ThemeBlue.withValues(alpha: 0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: soV2ThemeBlue.withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -165,189 +236,126 @@ class _MyLokasiCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Banner header: nama lokasi sebagai judul utama.
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [soV2ThemeBlue, soV2ThemeBlueLight],
-                  ),
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                      right: -12,
-                      top: -18,
-                      child: Icon(
-                        icon,
-                        size: 92,
-                        color: Colors.white.withValues(alpha: 0.12),
-                      ),
-                    ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            locationName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(icon, size: 12, color: Colors.white),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    categoryName,
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (complete) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle,
-                                      size: 13,
-                                      color: soV2CompleteGreen,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Selesai',
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: soV2CompleteGreen,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Detail: progress dan ringkasan label.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-                child: Column(
+          child: Padding(
+            padding: const EdgeInsets.all(26),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Kuadran atas: lokasi (kiri) & persentase discan (kanan).
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${location.scannedCount}/${location.labelCount} label discan',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1F2937),
-                          ),
+                    Expanded(
+                      child: Text(
+                        locationName,
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1F2937),
+                          height: 1,
                         ),
-                        Text(
-                          '${(progress * 100).round()}%',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: soV2ThemeBlue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 8,
-                        backgroundColor: Colors.grey.shade200,
-                        color: complete ? soV2CompleteGreen : soV2ThemeBlue,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Row(
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Icon(
-                          Icons.scale_outlined,
-                          size: 14,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 4),
                         Text(
-                          '${soV2FormatQuantity(location.totalQuantity)} $unit total',
+                          '${(progress * 100).round()}%',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w800,
+                            color: progressColor,
+                            height: 1,
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(height: 5),
                         Text(
-                          myLokasi.stockOpnameNo,
+                          complete ? 'Selesai' : 'Terscan',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade400,
-                            letterSpacing: 0.2,
+                            color: complete
+                                ? soV2CompleteGreen
+                                : Colors.grey.shade500,
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 18,
-                          color: Colors.grey.shade400,
                         ),
                       ],
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 22),
+                const Divider(height: 1, color: Color(0xFFE7EAF0)),
+                const SizedBox(height: 20),
+                // Kuadran bawah: berat/pcs hasil scan (kiri) & jumlah label discan (kanan).
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.scale_outlined,
+                            size: 19,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              '${soV2FormatQuantity(location.totalQuantity)} $unit',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF1F2937),
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.qr_code_scanner_rounded,
+                          size: 19,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          '${location.scannedCount}/${location.labelCount} label',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF1F2937),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        myLokasi.stockOpnameNo,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade400,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 22,
+                      color: Colors.grey.shade400,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

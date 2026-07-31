@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:vibration/vibration.dart';
 
 import '../../../core/network/api_errors.dart';
+import '../model/so_v2_models.dart';
 import '../repository/so_v2_repository.dart';
 import 'so_v2_category_style.dart';
 
@@ -16,11 +17,18 @@ class SoV2ScanScreen extends StatefulWidget {
     required this.stockOpnameNo,
     required this.blok,
     required this.locationId,
+    this.pendingLabels = const [],
   });
 
   final String stockOpnameNo;
   final String blok;
   final int locationId;
+
+  /// Currently loaded label rows for this lokasi, used to resolve which
+  /// pallet a scanned bahan-baku labelNo refers to (see [_submitLabel]).
+  /// Only rows already fetched by the detail screen are considered — rows
+  /// on further pagination pages are not included.
+  final List<SoV2LabelRow> pendingLabels;
 
   @override
   State<SoV2ScanScreen> createState() => _SoV2ScanScreenState();
@@ -81,7 +89,7 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
           textCapitalization: TextCapitalization.characters,
           decoration: const InputDecoration(
             labelText: 'Nomor label',
-            hintText: 'Contoh: B.0000013157',
+            hintText: 'Contoh: B.0000013157 atau A.0000002753-7',
           ),
           onSubmitted: (value) => Navigator.of(context).pop(value.trim()),
         ),
@@ -97,26 +105,146 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
         ],
       ),
     );
-    controller.dispose();
     if (label != null && label.isNotEmpty) {
       await _submitLabel(label);
     }
   }
 
+  // Bahan baku labels (e.g. "A.0000002753") can have several pallets
+  // pending under the same labelNo — pallet disambiguation only applies
+  // to this prefix; every other label is submitted as before.
+  static final RegExp _palletBasedPrefix = RegExp(
+    r'^(AB|A)\.',
+    caseSensitive: false,
+  );
+
+  final Set<String> _submittedPallets = {};
+
+  String _palletKey(String labelNo, dynamic noPallet) =>
+      '${labelNo.trim().toUpperCase()}#$noPallet';
+
+  int? _asPalletInt(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toInt();
+    return int.tryParse('$value');
+  }
+
+  Future<SoV2LabelRow?> _pickPallet(List<SoV2LabelRow> candidates) {
+    return showModalBottomSheet<SoV2LabelRow>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 4),
+              child: Text(
+                'Pilih Pallet',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Label ini punya beberapa pallet yang belum discan. Pilih salah satu:',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final row in candidates)
+              ListTile(
+                leading: const Icon(
+                  Icons.inventory_2_outlined,
+                  color: soV2ThemeBlue,
+                ),
+                title: Text('Pallet ${row.raw['NoPallet']}'),
+                subtitle: Text(
+                  [
+                    if (row.raw['Berat'] != null)
+                      '${soV2FormatQuantity(row.raw['Berat'])} kg',
+                    if (row.raw['JmlhSak'] != null) '${row.raw['JmlhSak']} sak',
+                  ].join(' · '),
+                ),
+                onTap: () => Navigator.of(context).pop(row),
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _submitLabel(String labelNo) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
+
+    final trimmed = labelNo.trim();
+    var submitLabelNo = trimmed;
+    int? palletNo;
+
+    if (_palletBasedPrefix.hasMatch(trimmed)) {
+      // Manual input mirrors the "labelNo-palletNo" format shown in the
+      // label list (e.g. "A.0000002753-7") — when present, the pallet is
+      // already explicit and no candidate search/picker is needed. A plain
+      // scanned barcode only carries labelNo, so that still falls back to
+      // matching against pendingLabels below.
+      final explicit = RegExp(r'^(.+)-(\d+)$').firstMatch(trimmed);
+      if (explicit != null) {
+        submitLabelNo = explicit.group(1)!.trim();
+        palletNo = int.tryParse(explicit.group(2)!);
+      } else {
+        final candidates = widget.pendingLabels.where((row) {
+          final noBahanBaku = row.raw['NoBahanBaku'];
+          final noPallet = row.raw['NoPallet'];
+          return noBahanBaku != null &&
+              '$noBahanBaku'.trim().toUpperCase() == trimmed.toUpperCase() &&
+              !row.isScanned &&
+              noPallet != null &&
+              !_submittedPallets.contains(_palletKey(trimmed, noPallet));
+        }).toList();
+
+        if (candidates.isEmpty) {
+          _showMessage(
+            'Label tidak ditemukan atau semua pallet sudah discan.',
+            isError: true,
+          );
+          if (mounted) setState(() => _isProcessing = false);
+          _releaseCode();
+          return;
+        }
+
+        if (candidates.length == 1) {
+          palletNo = _asPalletInt(candidates.first.raw['NoPallet']);
+        } else {
+          final chosen = await _pickPallet(candidates);
+          if (chosen == null) {
+            if (mounted) setState(() => _isProcessing = false);
+            _releaseCode();
+            return;
+          }
+          palletNo = _asPalletInt(chosen.raw['NoPallet']);
+        }
+      }
+    }
+
     try {
       final response = await _repository.submitResult(
         stockOpnameNo: widget.stockOpnameNo,
-        labelNo: labelNo,
-        palletNo: '',
+        labelNo: submitLabelNo,
         blok: widget.blok,
         locationId: widget.locationId,
+        palletNo: palletNo,
       );
       await Vibration.vibrate(duration: 80);
       unawaited(_audioPlayer.play(AssetSource('sounds/accepted.mp3')));
       if (!mounted) return;
+      if (palletNo != null) {
+        _submittedPallets.add(_palletKey(submitLabelNo, palletNo));
+      }
       final data = response['data'] as Map<String, dynamic>;
       final details = <String>[
         if (data['weight'] != null) '${data['weight']} kg',

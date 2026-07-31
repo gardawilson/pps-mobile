@@ -100,6 +100,9 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
 
   Future<void> _openScanner(SoV2DetailViewModel viewModel) async {
     final location = viewModel.location;
+    final pendingLabels = viewModel.groups
+        .expand((group) => group.labels)
+        .toList();
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -107,6 +110,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
           stockOpnameNo: widget.myLokasi.stockOpnameNo,
           blok: location.blok,
           locationId: location.locationId,
+          pendingLabels: pendingLabels,
         ),
       ),
     );
@@ -137,27 +141,37 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     return '$categoryName ($locationText)';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _viewModel,
-      child: Consumer<SoV2DetailViewModel>(
-        builder: (context, viewModel, _) {
-          return PopScope(
-            canPop: !_isSearching,
-            onPopInvokedWithResult: (didPop, _) {
-              if (!didPop) _handleBack(viewModel);
-            },
-            child: Scaffold(
-              backgroundColor: const Color(0xFFF5F7FA),
-              appBar: AppBar(
-                backgroundColor: soV2ThemeBlue,
-                foregroundColor: Colors.white,
-                leading: IconButton(
-                  onPressed: () => _handleBack(viewModel),
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                title: _isSearching
+  Widget _buildHeader(BuildContext context, SoV2DetailViewModel viewModel) {
+    final progress = viewModel.totalRecords == 0
+        ? 0.0
+        : (viewModel.totalScanned / viewModel.totalRecords).clamp(0.0, 1.0);
+    final complete = viewModel.isComplete;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        8,
+        MediaQuery.of(context).padding.top + 10,
+        16,
+        18,
+      ),
+      decoration: const BoxDecoration(
+        color: soV2ThemeBlue,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => _handleBack(viewModel),
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              ),
+              Expanded(
+                child: _isSearching
                     ? TextField(
                         controller: _searchController,
                         autofocus: true,
@@ -176,21 +190,95 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 17,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
-                actions: [
-                  IconButton(
-                    onPressed: _isSearching
-                        ? () => _closeSearch(viewModel)
-                        : _openSearch,
-                    icon: Icon(_isSearching ? Icons.close : Icons.search),
+              ),
+              IconButton(
+                onPressed: _isSearching
+                    ? () => _closeSearch(viewModel)
+                    : _openSearch,
+                icon: Icon(
+                  _isSearching ? Icons.close : Icons.search,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          if (!_isSearching) ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${viewModel.totalScanned}/${viewModel.totalRecords} label discan',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    viewModel.unit == 'pcs'
+                        ? Icons.numbers
+                        : Icons.scale_outlined,
+                    size: 14,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${soV2FormatQuantity(viewModel.totalQuantity)} ${viewModel.unit}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    complete ? 'Selesai' : '${(progress * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),
-              body: RefreshIndicator(
-                onRefresh: () => _refreshCurrentStep(viewModel),
-                child: _buildLabelStep(viewModel),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider.value(
+      value: _viewModel,
+      child: Consumer<SoV2DetailViewModel>(
+        builder: (context, viewModel, _) {
+          return PopScope(
+            canPop: !_isSearching,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop) _handleBack(viewModel);
+            },
+            child: Scaffold(
+              backgroundColor: const Color(0xFFF5F7FA),
+              body: Column(
+                children: [
+                  _buildHeader(context, viewModel),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: () => _refreshCurrentStep(viewModel),
+                      child: _buildLabelStep(viewModel),
+                    ),
+                  ),
+                ],
               ),
               floatingActionButton: !viewModel.isComplete
                   ? FloatingActionButton(
@@ -215,8 +303,6 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: [
-          _LokasiHeaderCard(myLokasi: widget.myLokasi, viewModel: viewModel),
-          const SizedBox(height: 16),
           if (viewModel.isLoadingLabels)
             const Padding(
               padding: EdgeInsets.all(32),
@@ -248,220 +334,6 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LokasiHeaderCard extends StatelessWidget {
-  const _LokasiHeaderCard({required this.myLokasi, required this.viewModel});
-
-  final SoV2MyLokasi myLokasi;
-  final SoV2DetailViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    final location = viewModel.location;
-    final progress = viewModel.totalRecords == 0
-        ? 0.0
-        : (viewModel.totalScanned / viewModel.totalRecords).clamp(0.0, 1.0);
-    final complete = viewModel.isComplete;
-    final icon = soV2IconForCategory(myLokasi.categoryCode);
-    final categoryName = KategoriConstants.getLabel(myLokasi.categoryCode);
-    final locationName = location.isUnknown
-        ? 'Lokasi Tidak Diketahui'
-        : '${location.blok}${location.locationId}';
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: soV2ThemeBlue.withValues(alpha: 0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [soV2ThemeBlue, soV2ThemeBlueLight],
-              ),
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  right: -12,
-                  top: -18,
-                  child: Icon(
-                    icon,
-                    size: 92,
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
-                ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        locationName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(icon, size: 12, color: Colors.white),
-                              const SizedBox(width: 4),
-                              Text(
-                                categoryName,
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (complete) ...[
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.check_circle,
-                                  size: 13,
-                                  color: soV2CompleteGreen,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Selesai',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: soV2CompleteGreen,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${viewModel.totalScanned}/${viewModel.totalRecords} label discan',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1F2937),
-                      ),
-                    ),
-                    Text(
-                      '${(progress * 100).round()}%',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: soV2ThemeBlue,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 8,
-                    backgroundColor: Colors.grey.shade200,
-                    color: complete ? soV2CompleteGreen : soV2ThemeBlue,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Icon(
-                      viewModel.unit == 'pcs'
-                          ? Icons.numbers
-                          : Icons.scale_outlined,
-                      size: 14,
-                      color: Colors.grey.shade500,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${soV2FormatQuantity(viewModel.totalQuantity)} ${viewModel.unit} total',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      myLokasi.stockOpnameNo,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade400,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

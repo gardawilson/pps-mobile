@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../../shared/components/app_drawer.dart';
 import '../model/mapping_v2_models.dart';
 import '../view_model/mapping_v2_view_model.dart';
 import 'mapping_v2_scan_screen.dart';
@@ -22,8 +21,7 @@ class _MappingV2ScreenState extends State<MappingV2Screen> {
   String _locationSearchQuery = '';
   bool _isLocationSearchActive = false;
 
-  final TextEditingController _labelSearchController =
-      TextEditingController();
+  final TextEditingController _labelSearchController = TextEditingController();
   String _labelSearchQuery = '';
   bool _isLabelSearchActive = false;
 
@@ -183,7 +181,6 @@ class _MappingV2ScreenState extends State<MappingV2Screen> {
             },
             child: Scaffold(
               backgroundColor: const Color(0xFFF1F5F9),
-              drawer: const AppDrawer(currentRoute: '/mapping-v2'),
               appBar: _isLocationSearchActive
                   ? _buildSearchAppBar(
                       controller: _locationSearchController,
@@ -213,17 +210,10 @@ class _MappingV2ScreenState extends State<MappingV2Screen> {
                   : AppBar(
                       backgroundColor: const Color(0xFF1E3A8A),
                       foregroundColor: Colors.white,
-                      leading: atRoot
-                          ? Builder(
-                              builder: (ctx) => IconButton(
-                                onPressed: () => Scaffold.of(ctx).openDrawer(),
-                                icon: const Icon(Icons.menu_rounded),
-                              ),
-                            )
-                          : IconButton(
-                              onPressed: () => _handleBack(viewModel),
-                              icon: const Icon(Icons.arrow_back),
-                            ),
+                      leading: IconButton(
+                        onPressed: () => _handleBack(viewModel),
+                        icon: const Icon(Icons.arrow_back),
+                      ),
                       title: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -759,7 +749,6 @@ class _JenisChipList extends StatelessWidget {
     );
   }
 }
-
 
 class _LabelCard extends StatelessWidget {
   const _LabelCard({required this.label});

@@ -79,12 +79,22 @@ class SoV2LabelRow {
   final Map<String, dynamic> raw;
 
   factory SoV2LabelRow.fromJson(Map<String, dynamic> json) {
-    final candidates = json.entries.where(
-      (entry) => !_excludedKeys.contains(entry.key),
-    );
-    final entry = candidates.isEmpty ? json.entries.first : candidates.first;
+    final noBahanBaku = json['NoBahanBaku'];
+    final noPallet = json['NoPallet'];
+    final String primaryValue;
+    if (noBahanBaku != null && noPallet != null) {
+      // Bahan baku labels share one labelNo across several pallets, so the
+      // pallet number is appended to disambiguate them in the label list.
+      primaryValue = '${_asString(noBahanBaku)}-${_asString(noPallet)}';
+    } else {
+      final candidates = json.entries.where(
+        (entry) => !_excludedKeys.contains(entry.key),
+      );
+      final entry = candidates.isEmpty ? json.entries.first : candidates.first;
+      primaryValue = _asString(entry.value);
+    }
     return SoV2LabelRow(
-      primaryValue: _asString(entry.value),
+      primaryValue: primaryValue,
       isScanned: _asBool(json['isScanned']),
       raw: json,
     );

@@ -59,21 +59,28 @@ class SoV2Repository {
     }
   }
 
+  /// Bahan baku labels (prefix `A.`/`AB.`) identify one pallet among several
+  /// sharing the same [labelNo], so the API expects only [labelNo] and the
+  /// resolved [palletNo] — no blok/locationId. Every other category keeps
+  /// the original 4-field shape.
   Future<Map<String, dynamic>> submitResult({
     required String stockOpnameNo,
     required String labelNo,
-    required String palletNo,
     required String blok,
     required int locationId,
+    int? palletNo,
   }) async {
+    final body = palletNo != null
+        ? {'labelNo': labelNo.trim(), 'palletNo': palletNo}
+        : {
+            'labelNo': labelNo.trim(),
+            'palletNo': '',
+            'blok': blok,
+            'locationId': locationId,
+          };
     final response = await _apiClient.postJson(
       '/api/stock-opname-v2/transaksi/${Uri.encodeComponent(stockOpnameNo)}/hasil',
-      body: {
-        'labelNo': labelNo.trim(),
-        'palletNo': palletNo.trim(),
-        'blok': blok,
-        'locationId': locationId,
-      },
+      body: body,
       useAuth: true,
     );
     return {
