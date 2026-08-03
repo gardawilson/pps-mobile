@@ -95,7 +95,11 @@ class _SoV2MyLokasiScreenState extends State<SoV2MyLokasiScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.qr_code_scanner_rounded, size: 17, color: Colors.white),
+                const Icon(
+                  Icons.qr_code_scanner_rounded,
+                  size: 17,
+                  color: Colors.white,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -118,9 +122,7 @@ class _SoV2MyLokasiScreenState extends State<SoV2MyLokasiScreen> {
 
   Future<void> _openDetail(SoV2MyLokasi myLokasi) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SoV2DetailScreen(myLokasi: myLokasi),
-      ),
+      MaterialPageRoute(builder: (_) => SoV2DetailScreen(myLokasi: myLokasi)),
     );
     if (mounted) {
       await _viewModel.load();
@@ -182,14 +184,11 @@ class _SoV2MyLokasiScreenState extends State<SoV2MyLokasiScreen> {
     }
 
     return ListView(
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
         for (final myLokasi in viewModel.items) ...[
-          _MyLokasiCard(
-            myLokasi: myLokasi,
-            onTap: () => _openDetail(myLokasi),
-          ),
+          _MyLokasiCard(myLokasi: myLokasi, onTap: () => _openDetail(myLokasi)),
           const SizedBox(height: 18),
         ],
       ],
