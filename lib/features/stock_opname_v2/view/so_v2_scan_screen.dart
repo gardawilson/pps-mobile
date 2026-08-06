@@ -110,15 +110,22 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
     }
   }
 
-  // Bahan baku labels (e.g. "A.0000002753") can have several pallets
-  // pending under the same labelNo — pallet disambiguation only applies
-  // to this prefix; every other label is submitted as before.
-  static final RegExp _palletBasedPrefix = RegExp(
-    r'^(AB|A)\.',
-    caseSensitive: false,
-  );
-
   final Set<String> _submittedPallets = {};
+
+  // Whether labelNo needs pallet disambiguation is a per-category backend
+  // config (bahan-baku, bahan-baku-pakai, proses — any category whose rows
+  // carry NoPallet), not something derivable from the label's prefix. The
+  // loaded pendingLabels rows already reflect that config (see
+  // SoV2LabelRow.fromJson), so use their presence as the signal instead of
+  // guessing from the labelNo string.
+  bool _isPalletBasedLabel(String noBahanBaku) {
+    return widget.pendingLabels.any((row) {
+      final value = row.raw['NoBahanBaku'];
+      return value != null &&
+          '$value'.trim().toUpperCase() == noBahanBaku.toUpperCase() &&
+          row.raw['NoPallet'] != null;
+    });
+  }
 
   String _palletKey(String labelNo, dynamic noPallet) =>
       '${labelNo.trim().toUpperCase()}#$noPallet';
@@ -186,48 +193,48 @@ class _SoV2ScanScreenState extends State<SoV2ScanScreen> {
     var submitLabelNo = trimmed;
     int? palletNo;
 
-    if (_palletBasedPrefix.hasMatch(trimmed)) {
-      // Manual input mirrors the "labelNo-palletNo" format shown in the
-      // label list (e.g. "A.0000002753-7") — when present, the pallet is
-      // already explicit and no candidate search/picker is needed. A plain
-      // scanned barcode only carries labelNo, so that still falls back to
-      // matching against pendingLabels below.
-      final explicit = RegExp(r'^(.+)-(\d+)$').firstMatch(trimmed);
-      if (explicit != null) {
-        submitLabelNo = explicit.group(1)!.trim();
-        palletNo = int.tryParse(explicit.group(2)!);
-      } else {
-        final candidates = widget.pendingLabels.where((row) {
-          final noBahanBaku = row.raw['NoBahanBaku'];
-          final noPallet = row.raw['NoPallet'];
-          return noBahanBaku != null &&
-              '$noBahanBaku'.trim().toUpperCase() == trimmed.toUpperCase() &&
-              !row.isScanned &&
-              noPallet != null &&
-              !_submittedPallets.contains(_palletKey(trimmed, noPallet));
-        }).toList();
+    // Manual input mirrors the "labelNo-palletNo" format shown in the label
+    // list (e.g. "A.0000002753-7") — when present, the pallet is already
+    // explicit and no candidate search/picker is needed. A plain scanned
+    // barcode only carries labelNo, so that falls back to matching against
+    // pendingLabels below.
+    final explicit = RegExp(r'^(.+)-(\d+)$').firstMatch(trimmed);
+    final baseLabel = explicit != null ? explicit.group(1)!.trim() : trimmed;
 
-        if (candidates.isEmpty) {
-          _showMessage(
-            'Label tidak ditemukan atau semua pallet sudah discan.',
-            isError: true,
-          );
+    if (explicit != null && _isPalletBasedLabel(baseLabel)) {
+      submitLabelNo = baseLabel;
+      palletNo = int.tryParse(explicit.group(2)!);
+    } else if (explicit == null && _isPalletBasedLabel(trimmed)) {
+      final candidates = widget.pendingLabels.where((row) {
+        final noBahanBaku = row.raw['NoBahanBaku'];
+        final noPallet = row.raw['NoPallet'];
+        return noBahanBaku != null &&
+            '$noBahanBaku'.trim().toUpperCase() == trimmed.toUpperCase() &&
+            !row.isScanned &&
+            noPallet != null &&
+            !_submittedPallets.contains(_palletKey(trimmed, noPallet));
+      }).toList();
+
+      if (candidates.isEmpty) {
+        _showMessage(
+          'Label tidak ditemukan atau semua pallet sudah discan.',
+          isError: true,
+        );
+        if (mounted) setState(() => _isProcessing = false);
+        _releaseCode();
+        return;
+      }
+
+      if (candidates.length == 1) {
+        palletNo = _asPalletInt(candidates.first.raw['NoPallet']);
+      } else {
+        final chosen = await _pickPallet(candidates);
+        if (chosen == null) {
           if (mounted) setState(() => _isProcessing = false);
           _releaseCode();
           return;
         }
-
-        if (candidates.length == 1) {
-          palletNo = _asPalletInt(candidates.first.raw['NoPallet']);
-        } else {
-          final chosen = await _pickPallet(candidates);
-          if (chosen == null) {
-            if (mounted) setState(() => _isProcessing = false);
-            _releaseCode();
-            return;
-          }
-          palletNo = _asPalletInt(chosen.raw['NoPallet']);
-        }
+        palletNo = _asPalletInt(chosen.raw['NoPallet']);
       }
     }
 
