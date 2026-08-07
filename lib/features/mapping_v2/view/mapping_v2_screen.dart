@@ -140,8 +140,11 @@ class _MappingV2ScreenState extends State<MappingV2Screen> {
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) =>
-            MappingV2ScanScreen(blok: blok.blok, idLokasi: location.idLokasi),
+        builder: (_) => MappingV2ScanScreen(
+          blok: blok.blok,
+          idLokasi: location.idLokasi,
+          initialLabelCount: location.totalLabel,
+        ),
       ),
     );
     await viewModel.loadLabels(reset: true);

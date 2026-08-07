@@ -13,10 +13,12 @@ class MappingV2ScanScreen extends StatefulWidget {
     super.key,
     required this.blok,
     required this.idLokasi,
+    this.initialLabelCount = 0,
   });
 
   final String blok;
   final int idLokasi;
+  final int initialLabelCount;
 
   @override
   State<MappingV2ScanScreen> createState() => _MappingV2ScanScreenState();
@@ -34,10 +36,12 @@ class _MappingV2ScanScreenState extends State<MappingV2ScanScreen> {
   bool _torchEnabled = false;
   String? _lastCode;
   Timer? _releaseTimer;
+  late int _scannedCount;
 
   @override
   void initState() {
     super.initState();
+    _scannedCount = widget.initialLabelCount;
     _requestCameraPermission();
   }
 
@@ -111,6 +115,7 @@ class _MappingV2ScanScreenState extends State<MappingV2ScanScreen> {
       await Vibration.vibrate(duration: 80);
       unawaited(_audioPlayer.play(AssetSource('sounds/accepted.mp3')));
       if (!mounted) return;
+      setState(() => _scannedCount++);
       _showMessage(result.message, isError: false);
     } catch (e) {
       await Vibration.vibrate(pattern: [0, 180, 100, 180]);
@@ -152,6 +157,28 @@ class _MappingV2ScanScreenState extends State<MappingV2ScanScreen> {
         foregroundColor: Colors.white,
         title: Text('Scan ${widget.blok}${widget.idLokasi}'),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$_scannedCount label',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
           IconButton(
             tooltip: 'Flash',
             onPressed: () async {
